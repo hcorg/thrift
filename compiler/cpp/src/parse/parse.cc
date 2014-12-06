@@ -37,7 +37,15 @@ void t_type::generate_fingerprint() {
 t_type* t_type::get_true_type() {
   t_type* type = this;
   while (type->is_typedef()) {
-    type = ((t_typedef*)type)->get_type();
+    type = static_cast<t_typedef*>(type)->get_type();
+  }
+  return type;
+}
+
+const t_type* t_type::get_true_type() const {
+  const t_type* type = this;
+  while (type->is_typedef()) {
+    type = static_cast<const t_typedef*>(type)->get_type();
   }
   return type;
 }

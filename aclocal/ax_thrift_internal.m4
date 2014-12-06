@@ -1,11 +1,9 @@
-dnl @synopsis AX_THRIFT_GEN(SHORT_LANGUAGE, LONG_LANGUAGE, DEFAULT)
 dnl @synopsis AX_THRIFT_LIB(SHORT_LANGUAGE, LONG_LANGUAGE, DEFAULT)
 dnl
-dnl Allow a particular language generator to be disabled.
 dnl Allow a particular language library to be disabled.
 dnl
-dnl These macros have poor error handling and are poorly documented.
-dnl They are intended only for internal use by the Thrift compiler.
+dnl This macro has poor error handling and is poorly documented.
+dnl It is intended only for internal use by the Thrift compiler.
 dnl
 dnl @version 2008-02-20
 dnl @license AllPermissive

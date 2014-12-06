@@ -245,28 +245,28 @@ OpenSSLManualInitTest_LDADD = \
 THRIFT = $(top_builddir)/compiler/cpp/thrift
 
 gen-cpp/DebugProtoTest_types.cpp gen-cpp/DebugProtoTest_types.h: $(top_srcdir)/test/DebugProtoTest.thrift
-	$(THRIFT) --gen cpp:dense $<
+	$(THRIFT) --gen cpp_v1:dense $<
 
 gen-cpp/EnumTest_types.cpp gen-cpp/EnumTest_types.h: $(top_srcdir)/test/EnumTest.thrift
-	$(THRIFT) --gen cpp $<
+	$(THRIFT) --gen cpp_v1 $<
 
 gen-cpp/TypedefTest_types.cpp gen-cpp/TypedefTest_types.h: $(top_srcdir)/test/TypedefTest.thrift
-	$(THRIFT) --gen cpp $<
+	$(THRIFT) --gen cpp_v1 $<
 
 gen-cpp/OptionalRequiredTest_types.cpp gen-cpp/OptionalRequiredTest_types.h: $(top_srcdir)/test/OptionalRequiredTest.thrift
-	$(THRIFT) --gen cpp:dense $<
+	$(THRIFT) --gen cpp_v1:dense $<
 
 gen-cpp/Recursive_types.cpp gen-cpp/Recursive_types.h: $(top_srcdir)/test/Recursive.thrift
-	$(THRIFT) --gen cpp $<
+	$(THRIFT) --gen cpp_v1 $<
 
 gen-cpp/Service.cpp gen-cpp/StressTest_types.cpp: $(top_srcdir)/test/StressTest.thrift
-	$(THRIFT) --gen cpp:dense $<
+	$(THRIFT) --gen cpp_v1:dense $<
 
 gen-cpp/SecondService.cpp gen-cpp/ThriftTest_constants.cpp gen-cpp/ThriftTest.cpp gen-cpp/ThriftTest_types.cpp gen-cpp/ThriftTest_types.h: $(top_srcdir)/test/ThriftTest.thrift
-	$(THRIFT) --gen cpp:dense $<
+	$(THRIFT) --gen cpp_v1:dense $<
 
 gen-cpp/ChildService.cpp gen-cpp/ChildService.h gen-cpp/ParentService.cpp gen-cpp/ParentService.h gen-cpp/proc_types.cpp gen-cpp/proc_types.h: processor/proc.thrift
-	$(THRIFT) --gen cpp:templates,cob_style $<
+	$(THRIFT) --gen cpp_v1:templates,cob_style $<
 
 AM_CPPFLAGS = $(BOOST_CPPFLAGS) -I$(top_srcdir)/lib/cpp/src
 AM_LDFLAGS = $(BOOST_LDFLAGS)

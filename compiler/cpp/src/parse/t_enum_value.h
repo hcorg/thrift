@@ -21,6 +21,8 @@
 #define T_ENUM_VALUE_H
 
 #include <string>
+#include <map>
+
 #include "t_doc.h"
 
 /**

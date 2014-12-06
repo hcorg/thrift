@@ -125,7 +125,7 @@ libthriftqt_la_LDFLAGS   = -release $(VERSION) $(BOOST_LDFLAGS) $(QT_LIBS)
 
 include_thriftdir = $(includedir)/thrift
 include_thrift_HEADERS = \
-                         $(top_builddir)/config.h \
+                         src/thrift/config.h \
                          src/thrift/thrift-config.h \
                          src/thrift/TDispatchProcessor.h \
                          src/thrift/Thrift.h \
@@ -246,3 +246,8 @@ EXTRA_DIST = \
 
 style-local:
 	$(CPPSTYLE_CMD)
+
+# Copied, so autotools will not add directory to -I if AC_CONFIG_HEADERS was used
+src/thrift/config.h: $(top_builddir)/config.h
+	cp $< $@
+$(libthrift_la_SOURCES): src/thrift/config.h

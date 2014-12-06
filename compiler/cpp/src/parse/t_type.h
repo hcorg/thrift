@@ -63,6 +63,7 @@ public:
   const t_program* get_program() const { return program_; }
 
   t_type* get_true_type();
+  const t_type* get_true_type() const;
 
   // Return a string that uniquely identifies this type
   // from any other thrift type in the world, as far as

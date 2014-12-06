@@ -44,6 +44,17 @@ public:
     TYPE_DOUBLE
   };
 
+  static t_base_type* type_void;
+  static t_base_type* type_string;
+  static t_base_type* type_binary;
+  static t_base_type* type_slist;
+  static t_base_type* type_bool;
+  static t_base_type* type_byte;
+  static t_base_type* type_i16;
+  static t_base_type* type_i32;
+  static t_base_type* type_i64;
+  static t_base_type* type_double;
+
   t_base_type(std::string name, t_base base)
     : t_type(name), base_(base), string_list_(false), binary_(false), string_enum_(false) {}
 

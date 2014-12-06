@@ -50,7 +50,7 @@ BOOST_AUTO_TEST_CASE(test_enum) {
 }
 
 BOOST_AUTO_TEST_CASE(test_enum_constant) {
-  MyStruct ms;
+  MyEnumStruct ms;
   BOOST_CHECK_EQUAL(ms.me2_2, 2);
   BOOST_CHECK_EQUAL(ms.me3_n2, -2);
   BOOST_CHECK_EQUAL(ms.me3_d1, 1);

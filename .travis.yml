@@ -78,7 +78,7 @@ matrix:
        - sh contrib/installCXXDependencies.sh;
        - sudo apt-get install nsis
       script:
-       - mkdir build_mingw32 && cd build_mingw32 && cmake -DCMAKE_TOOLCHAIN_FILE=../contrib/mingw32-toolchain.cmake ../compiler/cpp/ && make -j4 && cpack && cd ..;
+       - mkdir build_mingw32 && cd build_mingw32 && cmake -DCMAKE_TOOLCHAIN_FILE=../contrib/mingw32-toolchain.cmake -DTHRIFT_COMPILER_CPP_V2=OFF ../compiler/cpp/ && make -j4 && cpack && cd ..;
 
     - env:
         - TEST_NAME="all (gcc, automake)"
@@ -172,6 +172,9 @@ matrix:
     - env:    TEST_NAME="cppcheck (cpp) error"
       script: cppcheck --force --quiet --inline-suppr --error-exitcode=1 -j2 lib/cpp/src lib/cpp/test test/cpp tutorial/cpp
       before_install: sudo apt-get install cppcheck
+    - env:    TEST_NAME="cppcheck (cpp_v2) error"
+      script: cppcheck --force --quiet --inline-suppr --error-exitcode=1 -j2 lib/cpp_v2/src lib/cpp_v2/test test/cpp_v2 tutorial/cpp_v2
+      before_install: sudo apt-get install cppcheck
     - env:    TEST_NAME="cppcheck (c_glib) error"
       script: cppcheck --force --quiet --inline-suppr --error-exitcode=1 -j2 lib/c_glib/src lib/c_glib/test test/c_glib/src tutorial/c_glib
       before_install: sudo apt-get install cppcheck
@@ -181,6 +184,9 @@ matrix:
       before_install: sudo apt-get install cppcheck
     - env:    TEST_NAME="cppcheck (cpp) all"
       script: cppcheck --force --quiet --inline-suppr --enable=all -j2 lib/cpp/src lib/cpp/test test/cpp tutorial/cpp
+      before_install: sudo apt-get install cppcheck
+    - env:    TEST_NAME="cppcheck (cpp_v2) all"
+      script: cppcheck --force --quiet --inline-suppr --enable=all -j2 lib/cpp_v2/src lib/cpp_v2/test test/cpp_v2 tutorial/cpp_v2
       before_install: sudo apt-get install cppcheck
     - env:    TEST_NAME="cppcheck (c_glib) all"
       script: cppcheck --force --quiet --inline-suppr --enable=all -j2 lib/c_glib/src lib/c_glib/test test/c_glib/src tutorial/c_glib

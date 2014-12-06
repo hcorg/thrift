@@ -47,11 +47,18 @@ test-driver
 /autoscan-*.log
 /compiler/cpp/Debug
 /compiler/cpp/Release
-/compiler/cpp/libparse.a
+/compiler/cpp/src/libparse.a
+/compiler/cpp/src/libparseobjects.a
+/compiler/cpp/src/libcompilermd5.a
 /compiler/cpp/src/thriftl.cc
 /compiler/cpp/src/thrifty.cc
 /compiler/cpp/src/thrifty.hh
+/compiler/cpp/src/version.h
 /compiler/cpp/src/windows/version.h
+/compiler/cpp/src/generate/libgenerate.a
+/compiler/cpp/src/generate/tests/CompilerGeneratorUnitTests
+/compiler/cpp/src/generate/cpp_v2/libgenerate_cpp_v2.a
+/compiler/cpp/src/generate/cpp_v2/tests/CompilerCppV2GeneratorUnitTests
 /compiler/cpp/thrift
 /compiler/cpp/thriftl.cc
 /compiler/cpp/thrifty.cc
@@ -109,6 +116,10 @@ test-driver
 /lib/cpp/x64/Debug-mt/
 /lib/cpp/x64/Release
 /lib/cpp/x64/Release-mt
+/lib/cpp_v2/src/thrift/config.h
+/lib/cpp_v2/src/thrift/stamp-*
+/lib/cpp_v2/*.pc
+/lib/cpp_v2/test/unit_tests/CppV2UnitTests
 /lib/c_glib/*.gcda
 /lib/c_glib/*.gcno
 /lib/c_glib/*.loT
@@ -241,6 +252,8 @@ test-driver
 /test/rb/Gemfile.lock
 /tutorial/cpp/TutorialClient
 /tutorial/cpp/TutorialServer
+/tutorial/cpp_v2/TutorialClient
+/tutorial/cpp_v2/TutorialServer
 /tutorial/c_glib/tutorial_client
 /tutorial/c_glib/tutorial_server
 /tutorial/delphi/*.dsk
@@ -262,4 +275,3 @@ test-driver
 /tutorial/java/build/
 /tutorial/js/build/
 /ylwrap
-

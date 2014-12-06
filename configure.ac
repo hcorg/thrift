@@ -99,6 +99,7 @@ AC_PROG_RANLIB
 
 AC_LANG([C++])
 AX_CXX_COMPILE_STDCXX_11([noext])
+AM_CONDITIONAL([HAVE_CPP11], [test "$HAVE_CXX11" = "1"])
 
 AM_EXTRA_RECURSIVE_TARGETS([style])
 AC_SUBST(CPPSTYLE_CMD, 'find . -type f \( -iname "*.h" -or -iname "*.cpp" -or -iname "*.cc" -or -iname "*.tcc" \) -printf "Reformatting: %h/%f\n" -exec clang-format -i {} \;')
@@ -110,27 +111,9 @@ AC_ARG_ENABLE([libs],
 have_libs=yes
 if test "$enable_libs" = "no"; then
   have_libs="no"
-  with_cpp="no"
-  with_c_glib="no"
-  with_java="no"
-  with_csharp="no"
-  with_python="no"
-  with_ruby="no"
-  with_haskell="no"
-  with_haxe="no"
-  with_perl="no"
-  with_php="no"
-  with_php_extension="no"
-  with_erlang="no"
-  with_go="no"
-  with_d="no"
-  with_nodejs="no"
-  with_lua="no"
 fi
 
-
-AX_THRIFT_LIB(cpp, [C++], yes)
-have_cpp=no
+AX_THRIFT_LIB(cpp, [C++], $have_libs)
 if test "$with_cpp" = "yes";  then
   AX_BOOST_BASE([1.54.0])
   if test "x$succeeded" = "xyes" ; then
@@ -158,7 +141,23 @@ AM_CONDITIONAL([AMX_HAVE_LIBEVENT], [test "$have_libevent" = "yes"])
 AM_CONDITIONAL([AMX_HAVE_ZLIB], [test "$have_zlib" = "yes"])
 AM_CONDITIONAL([AMX_HAVE_QT], [test "$have_qt" = "yes"])
 
-AX_THRIFT_LIB(c_glib, [C (GLib)], yes)
+if test "$HAVE_CXX11" = "1"; then
+  AX_THRIFT_LIB(cpp_v2, [C++ (Version 2)], $have_libs)
+  if test "$with_cpp_v2" = "yes"; then
+    AX_BOOST_BASE([1.54.0])
+    if test "x$succeeded" = "xyes" ; then
+      have_cpp_v2="yes"
+    fi
+
+    AX_LIB_ZLIB([1.2.3])
+    have_cpp_v2_zlib=$success
+
+  fi
+  AM_CONDITIONAL([WITH_CPP_V2], [test "$have_cpp_v2" = "yes"])
+  AM_CONDITIONAL([WITH_CPP_V2_ZLIB], [test "$have_cpp_v2_zlib" = "yes"])
+fi
+
+AX_THRIFT_LIB(c_glib, [C (GLib)], $have_libs)
 if test "$with_c_glib" = "yes"; then
   PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.0], have_glib2=yes, have_glib2=no)
   PKG_CHECK_MODULES([GOBJECT], [gobject-2.0 >= 2.0], have_gobject2=yes, have_gobject2=no)
@@ -168,7 +167,7 @@ if test "$with_c_glib" = "yes"; then
 fi
 AM_CONDITIONAL(WITH_C_GLIB, [test "$have_glib2" = "yes" -a "$have_gobject2" = "yes"])
 
-AX_THRIFT_LIB(csharp, [C#], yes)
+AX_THRIFT_LIB(csharp, [C#], $have_libs)
 if test "$with_csharp" = "yes";  then
   PKG_CHECK_MODULES(MONO, mono >= 2.0.0, net_3_5=yes, net_3_5=no)
   PKG_CHECK_MODULES(MONO, mono >= 1.2.4, have_mono=yes, have_mono=no)
@@ -179,7 +178,7 @@ fi
 AM_CONDITIONAL(WITH_MONO, [test "$have_csharp" = "yes"])
 AM_CONDITIONAL(NET_2_0, [test "$net_3_5" = "no"])
 
-AX_THRIFT_LIB(java, [Java], yes)
+AX_THRIFT_LIB(java, [Java], $have_libs)
 if test "$with_java" = "yes";  then
   AX_JAVAC_AND_JAVA
   AC_PATH_PROG([ANT], [ant])
@@ -192,7 +191,7 @@ if test "$with_java" = "yes";  then
 fi
 AM_CONDITIONAL([WITH_JAVA], [test "$have_java" = "yes"])
 
-AX_THRIFT_LIB(erlang, [Erlang], yes)
+AX_THRIFT_LIB(erlang, [Erlang], $have_libs)
 if test "$with_erlang" = "yes";  then
   AC_ERLANG_PATH_ERL
   AC_ERLANG_PATH_ERLC
@@ -208,7 +207,7 @@ if test "$with_erlang" = "yes";  then
 fi
 AM_CONDITIONAL(WITH_ERLANG, [test "$have_erlang" = "yes"])
 
-AX_THRIFT_LIB(nodejs, [Nodejs], yes)
+AX_THRIFT_LIB(nodejs, [Nodejs], $have_libs)
 have_nodejs=no
 if test "$with_nodejs" = "yes"; then
   AC_PATH_PROGS([NODEJS], [nodejs node])
@@ -220,7 +219,7 @@ fi
 AM_CONDITIONAL(WITH_NODEJS, [test "$have_nodejs" = "yes"])
 AM_CONDITIONAL(HAVE_NPM, [test "x$NPM" != "x"])
 
-AX_THRIFT_LIB(lua, [Lua], yes)
+AX_THRIFT_LIB(lua, [Lua], $have_libs)
 have_lua=no
 if test "$with_lua" = "yes"; then
   AC_PATH_PROGS([LUA], [lua])
@@ -230,7 +229,7 @@ if test "$with_lua" = "yes"; then
 fi
 AM_CONDITIONAL(WITH_LUA, [test "$have_lua" = "yes"])
 
-AX_THRIFT_LIB(python, [Python], yes)
+AX_THRIFT_LIB(python, [Python], $have_libs)
 if test "$with_python" = "yes";  then
   AM_PATH_PYTHON(2.4,, :)
   if test "x$PYTHON" != "x" && test "x$PYTHON" != "x:" ; then
@@ -241,7 +240,7 @@ AM_CONDITIONAL(WITH_PYTHON, [test "$have_python" = "yes"])
 
 AC_PATH_PROG([TRIAL], [trial])
 
-AX_THRIFT_LIB(perl, [Perl], yes)
+AX_THRIFT_LIB(perl, [Perl], $have_libs)
 if test "$with_perl" = "yes"; then
   AC_PATH_PROG([PERL], [perl])
   if test -n "$PERL" ; then
@@ -258,7 +257,7 @@ if test "$with_perl" = "yes"; then
 fi
 AM_CONDITIONAL(WITH_PERL, [test "$have_perl" = "yes"])
 
-AX_THRIFT_LIB(php, [PHP], yes)
+AX_THRIFT_LIB(php, [PHP], $have_libs)
 if test "$with_php" = "yes"; then
   AC_PATH_PROG([PHP], [php])
   if test -n "$PHP" ; then
@@ -267,7 +266,7 @@ if test "$with_php" = "yes"; then
 fi
 AM_CONDITIONAL(WITH_PHP, [test "$have_php" = "yes"])
 
-AX_THRIFT_LIB(php_extension, [PHP_EXTENSION], yes)
+AX_THRIFT_LIB(php_extension, [PHP_EXTENSION], $have_libs)
 if test "$with_php_extension" = "yes"; then
   if test -f "lib/php/src/ext/thrift_protocol/configure"; then
     AC_PATH_PROG([PHP_CONFIG], [php-config])
@@ -282,7 +281,7 @@ AM_CONDITIONAL(WITH_PHP_EXTENSION, [test "$have_php_extension" = "yes"])
 AC_PATH_PROG([PHPUNIT], [phpunit])
 AM_CONDITIONAL(HAVE_PHPUNIT, [test "x$PHPUNIT" != "x"])
 
-AX_THRIFT_LIB(ruby, [Ruby], yes)
+AX_THRIFT_LIB(ruby, [Ruby], $have_libs)
 have_ruby=no
 if test "$with_ruby" = "yes"; then
   AC_PATH_PROG([RUBY], [ruby])
@@ -294,7 +293,7 @@ fi
 AM_CONDITIONAL(WITH_RUBY, [test "$have_ruby" = "yes"])
 AM_CONDITIONAL(HAVE_BUNDLER, [test "x$BUNDLER" != "x"])
 
-AX_THRIFT_LIB(haskell, [Haskell], yes)
+AX_THRIFT_LIB(haskell, [Haskell], $have_libs)
 have_haskell=no
 RUNHASKELL=true
 CABAL=true
@@ -312,7 +311,7 @@ AC_SUBST(CABAL)
 AC_SUBST(RUNHASKELL)
 AM_CONDITIONAL(WITH_HASKELL, [test "$have_haskell" = "yes"])
 
-AX_THRIFT_LIB(go, [Go], yes)
+AX_THRIFT_LIB(go, [Go], $have_libs)
 if test "$with_go" = "yes";  then
   AC_PATH_PROG([GO], [go])
   if [[ -x "$GO" ]] ; then
@@ -322,7 +321,7 @@ fi
 AM_CONDITIONAL(WITH_GO, [test "$have_go" = "yes"])
 
 
-AX_THRIFT_LIB(haxe, [Haxe], yes)
+AX_THRIFT_LIB(haxe, [Haxe], $have_libs)
 if test "$with_haxe" = "yes";  then
   AC_PATH_PROG([HAXE], [haxe])
   if [[ -x "$HAXE" ]] ; then
@@ -332,7 +331,7 @@ fi
 AM_CONDITIONAL(WITH_HAXE, [test "$have_haxe" = "yes"])
 
 
-AX_THRIFT_LIB(d, [D], yes)
+AX_THRIFT_LIB(d, [D], $have_libs)
 if test "$with_d" = "yes";  then
   AX_DMD
   AC_SUBST(DMD)
@@ -491,10 +490,6 @@ dnl of the POSIX Real-Time Extensions.  This seems necessary on Linux,
 dnl and we haven't yet found a system where this is a problem.
 AC_CHECK_LIB(rt, clock_gettime)
 AC_CHECK_LIB(socket, setsockopt)
-
-if test "$have_cpp" = "yes" ; then
-# mingw toolchain used to build "Thrift Compiler for Windows"
-# does not support libcrypto, so we just check if we building the cpp library
 AC_CHECK_LIB(crypto,
     BN_init,
     [AC_CHECK_LIB(ssl,
@@ -505,7 +500,6 @@ AC_CHECK_LIB(crypto,
     )],
     [AC_MSG_ERROR(["Error: libcrypto required."])]
 )
-fi
 
 AC_TYPE_INT16_T
 AC_TYPE_INT32_T
@@ -623,7 +617,6 @@ fi
 AM_CONDITIONAL([WITH_BOOSTTHREADS], [test "x[$]ENABLE_BOOSTTHREADS" = "x1"])
 
 AC_CONFIG_HEADERS(config.h:config.hin)
-AC_CONFIG_HEADERS(lib/cpp/src/thrift/config.h:config.hin)
 # gruard against pre defined config.h
 AH_TOP([
 #ifndef CONFIG_H
@@ -637,7 +630,12 @@ AH_BOTTOM([
 AC_CONFIG_FILES([
   Makefile
   compiler/cpp/Makefile
-  compiler/cpp/version.h
+  compiler/cpp/src/Makefile
+  compiler/cpp/src/version.h
+  compiler/cpp/src/generate/Makefile
+  compiler/cpp/src/generate/tests/Makefile
+  compiler/cpp/src/generate/cpp_v2/Makefile
+  compiler/cpp/src/generate/cpp_v2/tests/Makefile
   compiler/cpp/src/windows/version.h
   lib/Makefile
   lib/cpp/Makefile
@@ -646,6 +644,11 @@ AC_CONFIG_FILES([
   lib/cpp/thrift-z.pc
   lib/cpp/thrift-qt.pc
   lib/cpp/thrift.pc
+  lib/cpp_v2/Makefile
+  lib/cpp_v2/thrift.pc
+  lib/cpp_v2/thrift-z.pc
+  lib/cpp_v2/test/Makefile
+  lib/cpp_v2/test/unit_tests/Makefile
   lib/c_glib/Makefile
   lib/c_glib/thrift_c_glib.pc
   lib/c_glib/test/Makefile
@@ -683,6 +686,7 @@ AC_CONFIG_FILES([
   tutorial/Makefile
   tutorial/c_glib/Makefile
   tutorial/cpp/Makefile
+  tutorial/cpp_v2/Makefile
   tutorial/go/Makefile
   tutorial/haxe/Makefile
   tutorial/hs/Makefile
@@ -701,7 +705,8 @@ AC_OUTPUT
 echo
 echo "$PACKAGE $VERSION"
 echo
-echo "Building C++ Library ......... : $have_cpp"
+echo "Building C++ Library V1 ...... : $have_cpp"
+echo "Building C++ Library V2 ...... : $have_cpp_v2"
 echo "Building C (GLib) Library .... : $have_c_glib"
 echo "Building Java Library ........ : $have_java"
 echo "Building C# Library .......... : $have_csharp"
@@ -719,10 +724,17 @@ echo "Building Lua Library ......... : $have_lua"
 
 if test "$have_cpp" = "yes" ; then
   echo
-  echo "C++ Library:"
+  echo "C++ Library Version 1:"
   echo "   Build TZlibTransport ...... : $have_zlib"
   echo "   Build TNonblockingServer .. : $have_libevent"
   echo "   Build TQTcpServer (Qt) .... : $have_qt"
+fi
+if test "$have_cpp_v2" = "yes" ; then
+  echo
+  echo "C++ Library Version 2:"
+  echo "   Build TZlibTransport ...... : $have_cpp_v2_zlib"
+#  echo "   Build TNonblockingServer .. : $have_libevent"
+#  echo "   Build TQTcpServer (Qt) .... : $have_qt"
 fi
 if test "$have_java" = "yes" ; then
   echo

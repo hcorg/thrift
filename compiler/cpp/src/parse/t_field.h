@@ -21,12 +21,16 @@
 #define T_FIELD_H
 
 #include <string>
+#include <map>
 #include <sstream>
 
 #include "t_doc.h"
+#include "t_type.h"
 
 // Forward declare for xsd_attrs
 class t_struct;
+
+class t_const_value;
 
 /**
  * Class to represent a field in a thrift structure. A field has a data type,
@@ -72,7 +76,7 @@ public:
 
   void set_value(t_const_value* value) { value_ = value; }
 
-  t_const_value* get_value() { return value_; }
+  t_const_value* get_value() const { return value_; }
 
   void set_xsd_optional(bool xsd_optional) { xsd_optional_ = xsd_optional; }
 

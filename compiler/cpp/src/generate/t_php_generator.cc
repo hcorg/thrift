@@ -228,16 +228,6 @@ public:
     return (nsglobal_.size() ? NSGLOBAL_B : NSGLOBAL) + ns;
   }
 
-  // add a directory to already existing namespace
-  string php_namespace_directory(string directory, bool end = true) {
-    (void)directory;
-    if (end) {
-      return ";";
-    } else {
-      return "";
-    }
-  }
-
   // writing an autload identifier into globa;ls: my\namespace\ or my_namespace_
   string php_namespace_autoload(const t_program* p) {
     std::string ns = php_namespace_base(p);
@@ -2365,9 +2355,7 @@ string t_php_generator::argument_list(t_struct* tstruct, bool addTypeHints) {
     // Set type name
     if (addTypeHints) {
       if (type->is_struct()) {
-        string className = php_namespace(type->get_program())
-                           + php_namespace_directory("Definition", false)
-                           + classify(type->get_name());
+        string className = php_namespace(type->get_program()) + classify(type->get_name());
 
         result += className + " ";
       } else if (type->is_container()) {

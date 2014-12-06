@@ -123,7 +123,7 @@ public:
     return true;
   }
 
-  const members_type& get_members() { return members_; }
+  const members_type& get_members() const { return members_; }
 
   const members_type& get_sorted_members() { return members_in_id_order_; }
 
@@ -160,7 +160,7 @@ public:
     }
   }
 
-  t_field* get_field_by_name(std::string field_name) {
+  t_field* get_field_by_name(std::string field_name) const {
     members_type::const_iterator m_iter;
     for (m_iter = members_in_id_order_.begin(); m_iter != members_in_id_order_.end(); ++m_iter) {
       if ((*m_iter)->get_name() == field_name) {

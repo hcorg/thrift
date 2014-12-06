@@ -42,7 +42,7 @@ if(MSVC)
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h)
 else()
     set(FLEX_FLAGS " ")
-    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h)
+    configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h)
 endif()
 
 find_package(FLEX REQUIRED)
@@ -71,8 +71,6 @@ add_library(libparse STATIC ${libparse_SOURCES})
 set( thrift_SOURCES 
     src/main.cc
     src/md5.c
-    src/generate/t_generator.cc
-    src/generate/t_generator_registry.h
     src/globals.h
     src/main.h
     src/platform.h
@@ -80,6 +78,7 @@ set( thrift_SOURCES
     src/parse/t_doc.h
     src/parse/t_type.h
     src/parse/t_base_type.h
+    src/parse/t_base_type.cc
     src/parse/t_enum.h
     src/parse/t_enum_value.h
     src/parse/t_typedef.h
@@ -97,11 +96,20 @@ set( thrift_SOURCES
     src/parse/t_const.h
     src/parse/t_const_value.h
     src/parse/parse.cc
+    src/generate/t_generator.cc
+    src/generate/t_generator_registry.h
     src/generate/t_generator.h
     src/generate/t_oop_generator.h
     src/generate/t_html_generator.h
+    src/generate/IndentGuard.h
+    src/generate/IndentKeeper.cpp
+    src/generate/IndentKeeper.h
+    src/generate/PrePostGuard.h
+    src/generate/ScopeGuard.h
+    src/generate/OutputGenerator.h
+    src/generate/OutputGenerator.cpp
     src/windows/config.h
-    version.h
+    src/version.h
 )
 
 # This macro adds an option THRIFT_COMPILER_${NAME}
@@ -112,12 +120,16 @@ macro(THRIFT_ADD_COMPILER name description initial)
     option(${enabler} ${description} ${initial})
     if(${enabler})
         list(APPEND thrift_SOURCES ${src})
+        file(GLOB addtional_src "src/generate/${name}/*.cpp")
+        list(APPEND thrift_SOURCES ${addtional_src})
     endif()
 endmacro()
 
 # The following compiler can be enabled or disabled
 THRIFT_ADD_COMPILER(c_glib  "Enable compiler for C with Glib" ON)
 THRIFT_ADD_COMPILER(cpp     "Enable compiler for C++" ON)
+THRIFT_ADD_COMPILER(cpp_v1  "Enable compiler for C++ Version 1" ON)
+THRIFT_ADD_COMPILER(cpp_v2  "Enable compiler for C++ Version 2" ON)
 THRIFT_ADD_COMPILER(java    "Enable compiler for Java"   ON)
 THRIFT_ADD_COMPILER(as3     "Enable compiler for ActionScript 3" ON)
 THRIFT_ADD_COMPILER(haxe    "Enable compiler for Haxe" ON)

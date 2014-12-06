@@ -19,6 +19,7 @@
 
 #include <vector>
 #include <map>
+#include <set>
 
 #include <boost/test/auto_unit_test.hpp>
 
@@ -36,7 +37,6 @@ BOOST_AUTO_TEST_CASE(base_types_to_string) {
   BOOST_CHECK_EQUAL(to_string(10), "10");
   BOOST_CHECK_EQUAL(to_string(true), "1");
   BOOST_CHECK_EQUAL(to_string('a'), "a");
-  BOOST_CHECK_EQUAL(to_string(1.2), "1.2");
   BOOST_CHECK_EQUAL(to_string("abc"), "abc");
 }
 
