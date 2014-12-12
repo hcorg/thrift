@@ -39,6 +39,10 @@ lib_LTLIBRARIES += libthriftz2.la
 pkgconfig_DATA += thrift-z.pc
 endif
 
+AM_CXXFLAGS = -Wall -Wextra -pedantic
+AM_CPPFLAGS = $(BOOST_CPPFLAGS) $(OPENSSL_INCLUDES) -I$(srcdir)/src
+AM_LDFLAGS = $(BOOST_LDFLAGS) $(OPENSSL_LDFLAGS)
+
 # Define the source files for the module
 
 libthrift2_la_SOURCES = src/thrift/Thrift.cpp \
