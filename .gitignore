@@ -276,3 +276,4 @@ test-driver
 /tutorial/java/build/
 /tutorial/js/build/
 /ylwrap
+/cmake_*
