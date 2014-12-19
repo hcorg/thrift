@@ -30,18 +30,14 @@ pkgconfigdir = $(libdir)/pkgconfig
 lib_LTLIBRARIES = libthrift2.la
 pkgconfig_DATA = thrift.pc
 
-AM_LDFLAGS = -release $(VERSION)
+AM_LDFLAGS = -release $(VERSION) $(BOOST_LDFLAGS) $(OPENSSL_LDFLAGS)
 AM_CXXFLAGS = -Wall -Wextra -Wpedantic -Werror
-AM_CPPFLAGS = -I$(srcdir)/src $(BOOST_CPPFLAGS)
+AM_CPPFLAGS = -I$(srcdir)/src $(BOOST_CPPFLAGS) $(OPENSSL_INCLUDES)
 
 if WITH_CPP_V2_ZLIB
 lib_LTLIBRARIES += libthriftz2.la
 pkgconfig_DATA += thrift-z.pc
 endif
-
-AM_CXXFLAGS = -Wall -Wextra -pedantic
-AM_CPPFLAGS = $(BOOST_CPPFLAGS) $(OPENSSL_INCLUDES) -I$(srcdir)/src
-AM_LDFLAGS = $(BOOST_LDFLAGS) $(OPENSSL_LDFLAGS)
 
 # Define the source files for the module
 
