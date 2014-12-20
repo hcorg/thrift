@@ -79,7 +79,7 @@ CompilerCppV2GeneratorUnitTests_SOURCES = \
 	parse_dummies.cpp
 
 CompilerCppV2GeneratorUnitTests_LDADD = \
-	-l:libboost_unit_test_framework.a \
+	$(BOOST_TEST_LDADD) \
 	$(top_builddir)/compiler/cpp/src/libparseobjects.a \
 	$(top_builddir)/compiler/cpp/src/libcompilermd5.a \
 	$(top_builddir)/compiler/cpp/src/generate/libgenerate.a \

@@ -64,7 +64,7 @@ CppV2UnitTests_SOURCES = \
 	TypedefTests.cpp
 
 CppV2UnitTests_LDADD = \
-	-l:libboost_unit_test_framework.a \
+	$(BOOST_TEST_LDADD) \
 	$(top_builddir)/lib/cpp_v2/libthrift2.la
 
 THRIFT = $(top_builddir)/compiler/cpp/thrift
