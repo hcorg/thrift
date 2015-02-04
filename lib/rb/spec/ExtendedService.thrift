@@ -14,25 +14,12 @@
 # KIND, either express or implied. See the License for the
 # specific language governing permissions and limitations
 # under the License.
+#
 
+namespace rb Extended
 
-THRIFT = $(top_srcdir)/compiler/cpp/thrift
+include "BaseService.thrift"
 
-#stubs: $(top_srcdir)/test/ThriftTest.thrift
-#	$(THRIFT) --gen js:node -o test/ $(top_srcdir)/test/ThriftTest.thrift
-
-deps: $(top_srcdir)/package.json
-	$(NPM) install --no-bin-links $(top_srcdir)/
-
-check: deps
-	cd $(top_srcdir) && $(NPM) test && cd lib/nodejs
-
-clean-local:
-	$(RM) -r test/gen-nodejs
-	$(RM) -r $(top_srcdir)/node_modules
-
-EXTRA_DIST = \
-	examples \
-	lib \
-	test \
-	README.md
+service ExtendedService extends BaseService.BaseService {
+  void ping()
+}

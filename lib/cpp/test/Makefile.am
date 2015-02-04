@@ -18,6 +18,16 @@
 #
 AUTOMAKE_OPTIONS = subdir-objects serial-tests
 
+BUILT_SOURCES = gen-cpp/DebugProtoTest_types.h \
+                gen-cpp/EnumTest_types.h \
+                gen-cpp/OptionalRequiredTest_types.h \
+                gen-cpp/Recursive_types.h \
+                gen-cpp/ThriftTest_types.h \
+                gen-cpp/TypedefTest_types.h \
+                gen-cpp/ChildService.h \
+                gen-cpp/ParentService.h \
+                gen-cpp/proc_types.h
+
 noinst_LTLIBRARIES = libtestgencpp.la libprocessortest.la
 nodist_libtestgencpp_la_SOURCES = \
 	gen-cpp/DebugProtoTest_types.cpp \
@@ -76,7 +86,7 @@ check_PROGRAMS = \
 	EnumTest
 
 if AMX_HAVE_LIBEVENT
-noinst_PROGRAMS +=
+noinst_PROGRAMS += \
 	processor_test
 check_PROGRAMS += \
 	TNonblockingServerTest

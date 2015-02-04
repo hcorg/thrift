@@ -14,25 +14,14 @@
 # KIND, either express or implied. See the License for the
 # specific language governing permissions and limitations
 # under the License.
+#
 
+namespace rb Base
 
-THRIFT = $(top_srcdir)/compiler/cpp/thrift
+struct Hello {
+  1: string greeting = "hello world"
+}
 
-#stubs: $(top_srcdir)/test/ThriftTest.thrift
-#	$(THRIFT) --gen js:node -o test/ $(top_srcdir)/test/ThriftTest.thrift
-
-deps: $(top_srcdir)/package.json
-	$(NPM) install --no-bin-links $(top_srcdir)/
-
-check: deps
-	cd $(top_srcdir) && $(NPM) test && cd lib/nodejs
-
-clean-local:
-	$(RM) -r test/gen-nodejs
-	$(RM) -r $(top_srcdir)/node_modules
-
-EXTRA_DIST = \
-	examples \
-	lib \
-	test \
-	README.md
+service BaseService {
+  Hello greeting(1:bool english)
+}
