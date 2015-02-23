@@ -515,7 +515,7 @@ std::string doubleToString(double d)
 {
   std::ostringstream str;
   str.imbue(std::locale::classic());
-  str.precision(std::numeric_limits<double>::digits10 + 1);
+  str.precision(std::numeric_limits<double>::digits10 + 2);
   str << d;
   return str.str();
 }
@@ -825,6 +825,8 @@ double stringToDouble(const std::string& s)
   std::istringstream str(s);
   str.imbue(std::locale::classic());
   str >> d;
+  if (!str || static_cast<std::size_t>(str.gcount()) != s.size())
+    throw std::runtime_error(s);
   return d;
 }
 }
@@ -850,7 +852,7 @@ uint32_t TJSONProtocol::readJSONDouble(double& num) {
       }
       try {
         num = stringToDouble(str);
-      } catch (boost::bad_lexical_cast e) {
+      } catch (std::runtime_error e) {
         throw new TProtocolException(TProtocolException::INVALID_DATA,
                                      "Expected numeric value; got \"" + str + "\"");
       }
@@ -863,7 +865,7 @@ uint32_t TJSONProtocol::readJSONDouble(double& num) {
     result += readJSONNumericChars(str);
     try {
       num = stringToDouble(str);
-    } catch (boost::bad_lexical_cast e) {
+    } catch (std::runtime_error e) {
       throw new TProtocolException(TProtocolException::INVALID_DATA,
                                    "Expected numeric value; got \"" + str + "\"");
     }
