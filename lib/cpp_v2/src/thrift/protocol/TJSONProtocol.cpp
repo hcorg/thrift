@@ -512,7 +512,7 @@ std::string doubleToString(double d)
 {
   std::ostringstream str;
   str.imbue(std::locale::classic());
-  str.precision(std::numeric_limits<double>::digits10 + 2);
+  str.precision(std::numeric_limits<double>::digits10 + 1);
   str << d;
   return str.str();
 }
@@ -820,7 +820,7 @@ double stringToDouble(const std::string& s)
   std::istringstream str(s);
   str.imbue(std::locale::classic());
   str >> d;
-  if (!str || static_cast<std::size_t>(str.gcount()) != s.size())
+  if (str.bad() || !str.eof())
     throw std::runtime_error(s);
   return d;
 }
