@@ -23,6 +23,7 @@
 #include <string>
 #include <memory>
 
+#include <thrift/TProcessor.h>
 #include <thrift/transport/TTransport.h>
 #include <thrift/transport/TTransportUtils.h>
 #include <thrift/transport/TBufferTransports.h>

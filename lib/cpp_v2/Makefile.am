@@ -41,12 +41,12 @@ endif
 
 # Define the source files for the module
 
-libthrift2_la_SOURCES = src/thrift/Thrift.cpp \
+libthrift2_la_SOURCES = src/thrift/TOutput.cpp \
                         src/thrift/TApplicationException.cpp \
                         src/thrift/concurrency/WorkerPool.cpp \
                         src/thrift/client/ClientBase.cpp \
                         src/thrift/protocol/TDebugProtocol.cpp \
-                        src/thrift/protocol/TDenseProtocol.cpp \
+                        src/thrift/protocol/THeaderProtocol.cpp \
                         src/thrift/protocol/TJSONProtocol.cpp \
                         src/thrift/protocol/TBase64Utils.cpp \
                         src/thrift/protocol/TMultiplexedProtocol.cpp \
@@ -103,7 +103,7 @@ include_protocol_HEADERS = \
                          src/thrift/protocol/TBinaryProtocol.tcc \
                          src/thrift/protocol/TCompactProtocol.h \
                          src/thrift/protocol/TCompactProtocol.tcc \
-                         src/thrift/protocol/TDenseProtocol.h \
+                         src/thrift/protocol/THeaderProtocol.h \
                          src/thrift/protocol/TDebugProtocol.h \
                          src/thrift/protocol/TBase64Utils.h \
                          src/thrift/protocol/TJSONProtocol.h \

@@ -20,10 +20,10 @@
 #ifndef _THRIFT_PROTOCOL_TJSONPROTOCOL_H_
 #define _THRIFT_PROTOCOL_TJSONPROTOCOL_H_ 1
 
+#include <thrift/protocol/TVirtualProtocol.h>
+
 #include <stack>
 #include <memory>
-
-#include <thrift/protocol/TVirtualProtocol.h>
 
 namespace apache {
 namespace thrift {
@@ -53,6 +53,10 @@ class TJSONContext;
  * 4. Thrift binary values are encoded into Base64 and emitted as JSON strings.
  *    The readBinary() method is written such that it will properly skip if
  *    called on a Thrift string (although it will decode garbage data).
+ *
+ *    NOTE: Base64 padding is optional for Thrift binary value encoding. So
+ *    the readBinary() method needs to decode both input strings with padding
+ *    and those without one.
  *
  * 5. Thrift structs are represented as JSON objects, with the field ID as the
  *    key, and the field value represented as a JSON object with a single
@@ -124,7 +128,7 @@ private:
 
   uint32_t readJSONSyntaxChar(uint8_t ch);
 
-  uint32_t readJSONEscapeChar(uint8_t* out);
+  uint32_t readJSONEscapeChar(uint16_t* out);
 
   uint32_t readJSONString(std::string& str, bool skipContext = false);
 

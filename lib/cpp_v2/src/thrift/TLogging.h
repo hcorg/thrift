@@ -26,9 +26,11 @@
  * Contains utility macros for debugging and logging.
  *
  */
-#if T_GLOBAL_DEBUGGING_LEVEL > 0
-#include <ctime>
-#include <cstdint>
+
+#include <time.h>
+
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
 #endif
 
 /**

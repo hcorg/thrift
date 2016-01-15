@@ -17,6 +17,8 @@
  * under the License.
  */
 
+// clang-format off
+
 #ifndef _THRIFT_TRANSPORT_PLATFORM_SOCKET_H_
 #  define _THRIFT_TRANSPORT_PLATFORM_SOCKET_H_
 
@@ -74,7 +76,6 @@
 #  define THRIFT_SHUT_RDWR SD_BOTH
 #else //not _WIN32
 #  include <errno.h>
-#  include <unistd.h>
 #  define THRIFT_GET_SOCKET_ERROR errno
 #  define THRIFT_ERRNO errno
 #  define THRIFT_EINTR       EINTR

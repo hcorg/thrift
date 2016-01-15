@@ -64,7 +64,20 @@
 #define HAVE_GETTIMEOFDAY 1
 #define HAVE_SYS_STAT_H 1
 
-#include <cstdint>
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#else
+#include <boost/cstdint.hpp>
+
+typedef boost::int64_t int64_t;
+typedef boost::uint64_t uint64_t;
+typedef boost::int32_t int32_t;
+typedef boost::uint32_t uint32_t;
+typedef boost::int16_t int16_t;
+typedef boost::uint16_t uint16_t;
+typedef boost::int8_t int8_t;
+typedef boost::uint8_t uint8_t;
+#endif
 
 #include <thrift/transport/PlatformSocket.h>
 #include <thrift/windows/GetTimeOfDay.h>
@@ -81,5 +94,6 @@
 #else
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "advapi32.lib") // For security APIs in TPipeServer
+#pragma comment(lib, "Shlwapi.lib")  // For StrStrIA in TPipeServer
 #endif
 #endif // _THRIFT_WINDOWS_CONFIG_H_
