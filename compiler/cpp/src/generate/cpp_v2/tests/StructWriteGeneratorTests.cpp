@@ -91,7 +91,7 @@ BOOST_AUTO_TEST_CASE(empty_struct_generates_basic_write) {
 }
 
 BOOST_AUTO_TEST_CASE(struct_with_required_field_generates_write_for_it) {
-  t_field f1(t_base_type::type_byte, "f1", 10);
+  t_field f1(t_base_type::type_i8, "f1", 10);
   f1.set_req(t_field::T_REQUIRED);
   tstruct.append(&f1);
 
@@ -101,7 +101,7 @@ BOOST_AUTO_TEST_CASE(struct_with_required_field_generates_write_for_it) {
       "oprot->incrementRecursionDepth();\n"
       "xfer += oprot->writeStructBegin(\"StructName\");\n"
       "\n"
-      "xfer += oprot->writeFieldBegin(\"f1\", ::apache::thrift::protocol::T_BYTE, 10);\n"
+      "xfer += oprot->writeFieldBegin(\"f1\", ::apache::thrift::protocol::T_I8, 10);\n"
       "xfer += oprot->writeByte(this->f1);\n"
       "xfer += oprot->writeFieldEnd();\n"
       "\n"
@@ -112,7 +112,7 @@ BOOST_AUTO_TEST_CASE(struct_with_required_field_generates_write_for_it) {
 }
 
 BOOST_AUTO_TEST_CASE(struct_with_normal_field_generates_write_for_it) {
-  t_field f1(t_base_type::type_byte, "f1", 10);
+  t_field f1(t_base_type::type_i8, "f1", 10);
   f1.set_req(t_field::T_OPT_IN_REQ_OUT);
   tstruct.append(&f1);
 
@@ -122,7 +122,7 @@ BOOST_AUTO_TEST_CASE(struct_with_normal_field_generates_write_for_it) {
       "oprot->incrementRecursionDepth();\n"
       "xfer += oprot->writeStructBegin(\"StructName\");\n"
       "\n"
-      "xfer += oprot->writeFieldBegin(\"f1\", ::apache::thrift::protocol::T_BYTE, 10);\n"
+      "xfer += oprot->writeFieldBegin(\"f1\", ::apache::thrift::protocol::T_I8, 10);\n"
       "xfer += oprot->writeByte(this->f1);\n"
       "xfer += oprot->writeFieldEnd();\n"
       "\n"
@@ -133,7 +133,7 @@ BOOST_AUTO_TEST_CASE(struct_with_normal_field_generates_write_for_it) {
 }
 
 BOOST_AUTO_TEST_CASE(struct_with_optional_field_generates_optional_write_for_it) {
-  t_field f1(t_base_type::type_byte, "f1", 10);
+  t_field f1(t_base_type::type_i8, "f1", 10);
   f1.set_req(t_field::T_OPTIONAL);
   tstruct.append(&f1);
 
@@ -144,7 +144,7 @@ BOOST_AUTO_TEST_CASE(struct_with_optional_field_generates_optional_write_for_it)
       "xfer += oprot->writeStructBegin(\"StructName\");\n"
       "\n"
       "if (this->f1) {\n"
-      "  xfer += oprot->writeFieldBegin(\"f1\", ::apache::thrift::protocol::T_BYTE, 10);\n"
+      "  xfer += oprot->writeFieldBegin(\"f1\", ::apache::thrift::protocol::T_I8, 10);\n"
       "  xfer += oprot->writeByte(*(this->f1));\n"
       "  xfer += oprot->writeFieldEnd();\n"
       "}\n"

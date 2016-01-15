@@ -33,14 +33,14 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <climits>
 
 // Use this to get around strict aliasing rules.
 // For example, uint64_t i = bitwise_cast<uint64_t>(returns_double());
 // The most obvious implementation is to just cast a pointer,
 // but that doesn't work.
 // For a pretty in-depth explanation of the problem, see
-// http://www.cellperformance.com/mike_acton/2006/06/ (...)
-// understanding_strict_aliasing.html
+// http://cellperformance.beyond3d.com/articles/2006/06/understanding-strict-aliasing.html
 template <typename To, typename From>
 static inline To bitwise_cast(From from) {
   BOOST_STATIC_ASSERT(sizeof(From) == sizeof(To));
@@ -98,12 +98,18 @@ static inline To bitwise_cast(From from) {
 #endif
 
 #if __THRIFT_BYTE_ORDER == __THRIFT_BIG_ENDIAN
-#  define ntohll(n) (n)
-#  define htonll(n) (n)
+# if !defined(THRIFT_ntohll)
+#  define THRIFT_ntohll(n) (n)
+#  define THRIFT_htonll(n) (n)
+# endif
 # if defined(__GNUC__) && defined(__GLIBC__)
 #  include <byteswap.h>
-#  define htolell(n) bswap_64(n)
-#  define letohll(n) bswap_64(n)
+#  define THRIFT_htolell(n) bswap_64(n)
+#  define THRIFT_letohll(n) bswap_64(n)
+#  define THRIFT_htolel(n) bswap_32(n)
+#  define THRIFT_letohl(n) bswap_32(n)
+#  define THRIFT_htoles(n) bswap_16(n)
+#  define THRIFT_letohs(n) bswap_16(n)
 # else /* GNUC & GLIBC */
 #  define bswap_64(n) \
       ( (((n) & 0xff00000000000000ull) >> 56) \
@@ -114,25 +120,41 @@ static inline To bitwise_cast(From from) {
       | (((n) & 0x0000000000ff0000ull) << 24) \
       | (((n) & 0x000000000000ff00ull) << 40) \
       | (((n) & 0x00000000000000ffull) << 56) )
-#  define htolell(n) bswap_64(n)
-#  define letohll(n) bswap_64(n)
+#  define bswap_32(n) \
+      ( (((n) & 0xff000000ul) >> 24) \
+      | (((n) & 0x00ff0000ul) >> 8)  \
+      | (((n) & 0x0000ff00ul) << 8)  \
+      | (((n) & 0x000000fful) << 24) )
+#  define bswap_16(n) \
+      ( (((n) & ((unsigned short)0xff00ul)) >> 8)  \
+      | (((n) & ((unsigned short)0x00fful)) << 8)  )
+#  define THRIFT_htolell(n) bswap_64(n)
+#  define THRIFT_letohll(n) bswap_64(n)
+#  define THRIFT_htolel(n) bswap_32(n)
+#  define THRIFT_letohl(n) bswap_32(n)
+#  define THRIFT_htoles(n) bswap_16(n)
+#  define THRIFT_letohs(n) bswap_16(n)
 # endif /* GNUC & GLIBC */
 #elif __THRIFT_BYTE_ORDER == __THRIFT_LITTLE_ENDIAN
-#  define htolell(n) (n)
-#  define letohll(n) (n)
+#  define THRIFT_htolell(n) (n)
+#  define THRIFT_letohll(n) (n)
+#  define THRIFT_htolel(n) (n)
+#  define THRIFT_letohl(n) (n)
+#  define THRIFT_htoles(n) (n)
+#  define THRIFT_letohs(n) (n)
 # if defined(__GNUC__) && defined(__GLIBC__)
 #  include <byteswap.h>
-#  define ntohll(n) bswap_64(n)
-#  define htonll(n) bswap_64(n)
+#  define THRIFT_ntohll(n) bswap_64(n)
+#  define THRIFT_htonll(n) bswap_64(n)
 # elif defined(_MSC_VER) /* Microsoft Visual C++ */
-#  define ntohll(n) ( _byteswap_uint64((uint64_t)n) )
-#  define htonll(n) ( _byteswap_uint64((uint64_t)n) )
-# elif !defined(ntohll) /* Not GNUC/GLIBC or MSVC */
-#  define ntohll(n) ( (((uint64_t)ntohl((uint32_t)n)) << 32) + ntohl((uint32_t)(n >> 32)) )
-#  define htonll(n) ( (((uint64_t)htonl((uint32_t)n)) << 32) + htonl((uint32_t)(n >> 32)) )
+#  define THRIFT_ntohll(n) ( _byteswap_uint64((uint64_t)n) )
+#  define THRIFT_htonll(n) ( _byteswap_uint64((uint64_t)n) )
+# elif !defined(THRIFT_ntohll) /* Not GNUC/GLIBC or MSVC */
+#  define THRIFT_ntohll(n) ( (((uint64_t)ntohl((uint32_t)n)) << 32) + ntohl((uint32_t)(n >> 32)) )
+#  define THRIFT_htonll(n) ( (((uint64_t)htonl((uint32_t)n)) << 32) + htonl((uint32_t)(n >> 32)) )
 # endif /* GNUC/GLIBC or MSVC or something else */
 #else /* __THRIFT_BYTE_ORDER */
-# error "Can't define htonll or ntohll!"
+# error "Can't define THRIFT_htonll or THRIFT_ntohll!"
 #endif
 
 namespace apache {
@@ -178,105 +200,6 @@ enum TMessageType {
   T_ONEWAY     = 4
 };
 
-
-/**
- * Helper template for implementing TProtocol::skip().
- *
- * Templatized to avoid having to make virtual function calls.
- */
-template <class Protocol_>
-uint32_t skip(Protocol_& prot, TType type) {
-  switch (type) {
-  case T_BOOL: {
-    bool boolv;
-    return prot.readBool(boolv);
-  }
-  case T_BYTE: {
-    int8_t bytev;
-    return prot.readByte(bytev);
-  }
-  case T_I16: {
-    int16_t i16;
-    return prot.readI16(i16);
-  }
-  case T_I32: {
-    int32_t i32;
-    return prot.readI32(i32);
-  }
-  case T_I64: {
-    int64_t i64;
-    return prot.readI64(i64);
-  }
-  case T_DOUBLE: {
-    double dub;
-    return prot.readDouble(dub);
-  }
-  case T_STRING: {
-    std::string str;
-    return prot.readBinary(str);
-  }
-  case T_STRUCT: {
-    uint32_t result = 0;
-    std::string name;
-    int16_t fid;
-    TType ftype;
-    result += prot.readStructBegin(name);
-    while (true) {
-      result += prot.readFieldBegin(name, ftype, fid);
-      if (ftype == T_STOP) {
-        break;
-      }
-      result += skip(prot, ftype);
-      result += prot.readFieldEnd();
-    }
-    result += prot.readStructEnd();
-    return result;
-  }
-  case T_MAP: {
-    uint32_t result = 0;
-    TType keyType;
-    TType valType;
-    uint32_t i, size;
-    result += prot.readMapBegin(keyType, valType, size);
-    for (i = 0; i < size; i++) {
-      result += skip(prot, keyType);
-      result += skip(prot, valType);
-    }
-    result += prot.readMapEnd();
-    return result;
-  }
-  case T_SET: {
-    uint32_t result = 0;
-    TType elemType;
-    uint32_t i, size;
-    result += prot.readSetBegin(elemType, size);
-    for (i = 0; i < size; i++) {
-      result += skip(prot, elemType);
-    }
-    result += prot.readSetEnd();
-    return result;
-  }
-  case T_LIST: {
-    uint32_t result = 0;
-    TType elemType;
-    uint32_t i, size;
-    result += prot.readListBegin(elemType, size);
-    for (i = 0; i < size; i++) {
-      result += skip(prot, elemType);
-    }
-    result += prot.readListEnd();
-    return result;
-  }
-  case T_STOP:
-  case T_VOID:
-  case T_U64:
-  case T_UTF8:
-  case T_UTF16:
-    break;
-  }
-  return 0;
-}
-
 static const uint32_t DEFAULT_RECURSION_LIMIT = 64;
 
 /**
@@ -295,7 +218,7 @@ static const uint32_t DEFAULT_RECURSION_LIMIT = 64;
  */
 class TProtocol {
 public:
-  virtual ~TProtocol() {}
+  virtual ~TProtocol();
 
   /**
    * Writing functions.
@@ -620,7 +543,7 @@ public:
     T_VIRTUAL_CALL();
     return skip_virt(type);
   }
-  virtual uint32_t skip_virt(TType type) { return ::apache::thrift::protocol::skip(*this, type); }
+  virtual uint32_t skip_virt(TType type);
 
   inline boost::shared_ptr<TTransport> getTransport() { return ptrans_; }
 
@@ -629,23 +552,36 @@ public:
   inline boost::shared_ptr<TTransport> getInputTransport() { return ptrans_; }
   inline boost::shared_ptr<TTransport> getOutputTransport() { return ptrans_; }
 
-  void incrementRecursionDepth() {
-    if (recursion_limit_ < ++recursion_depth_) {
+  // input and output recursion depth are kept separate so that one protocol
+  // can be used concurrently for both input and output.
+  void incrementInputRecursionDepth() {
+    if (recursion_limit_ < ++input_recursion_depth_) {
       throw TProtocolException(TProtocolException::DEPTH_LIMIT);
     }
   }
+  void decrementInputRecursionDepth() { --input_recursion_depth_; }
 
-  void decrementRecursionDepth() { --recursion_depth_; }
+  void incrementOutputRecursionDepth() {
+    if (recursion_limit_ < ++output_recursion_depth_) {
+      throw TProtocolException(TProtocolException::DEPTH_LIMIT);
+    }
+  }
+  void decrementOutputRecursionDepth() { --output_recursion_depth_; }
+
+  uint32_t getRecursionLimit() const {return recursion_limit_;}
+  void setRecurisionLimit(uint32_t depth) {recursion_limit_ = depth;}
 
 protected:
   TProtocol(boost::shared_ptr<TTransport> ptrans)
-    : ptrans_(ptrans), recursion_depth_(0), recursion_limit_(DEFAULT_RECURSION_LIMIT) {}
+    : ptrans_(ptrans), input_recursion_depth_(0), output_recursion_depth_(0), recursion_limit_(DEFAULT_RECURSION_LIMIT)
+  {}
 
   boost::shared_ptr<TTransport> ptrans_;
 
 private:
   TProtocol() {}
-  uint32_t recursion_depth_;
+  uint32_t input_recursion_depth_;
+  uint32_t output_recursion_depth_;
   uint32_t recursion_limit_;
 };
 
@@ -656,9 +592,14 @@ class TProtocolFactory {
 public:
   TProtocolFactory() {}
 
-  virtual ~TProtocolFactory() {}
+  virtual ~TProtocolFactory();
 
   virtual boost::shared_ptr<TProtocol> getProtocol(boost::shared_ptr<TTransport> trans) = 0;
+  virtual boost::shared_ptr<TProtocol> getProtocol(boost::shared_ptr<TTransport> inTrans,
+						   boost::shared_ptr<TTransport> outTrans) {
+    (void)outTrans;
+    return getProtocol(inTrans);
+  }
 };
 
 /**
@@ -668,8 +609,149 @@ public:
  * It is used only by the generator code.
  */
 class TDummyProtocol : public TProtocol {};
+
+// This is the default / legacy choice
+struct TNetworkBigEndian
+{
+  static uint16_t toWire16(uint16_t x)   {return htons(x);}
+  static uint32_t toWire32(uint32_t x)   {return htonl(x);}
+  static uint64_t toWire64(uint64_t x)   {return THRIFT_htonll(x);}
+  static uint16_t fromWire16(uint16_t x) {return ntohs(x);}
+  static uint32_t fromWire32(uint32_t x) {return ntohl(x);}
+  static uint64_t fromWire64(uint64_t x) {return THRIFT_ntohll(x);}
+};
+
+// On most systems, this will be a bit faster than TNetworkBigEndian
+struct TNetworkLittleEndian
+{
+  static uint16_t toWire16(uint16_t x)   {return THRIFT_htoles(x);}
+  static uint32_t toWire32(uint32_t x)   {return THRIFT_htolel(x);}
+  static uint64_t toWire64(uint64_t x)   {return THRIFT_htolell(x);}
+  static uint16_t fromWire16(uint16_t x) {return THRIFT_letohs(x);}
+  static uint32_t fromWire32(uint32_t x) {return THRIFT_letohl(x);}
+  static uint64_t fromWire64(uint64_t x) {return THRIFT_letohll(x);}
+};
+
+struct TOutputRecursionTracker {
+  TProtocol &prot_;
+  TOutputRecursionTracker(TProtocol &prot) : prot_(prot) {
+    prot_.incrementOutputRecursionDepth();
+  }
+  ~TOutputRecursionTracker() {
+    prot_.decrementOutputRecursionDepth();
+  }
+};
+
+struct TInputRecursionTracker {
+  TProtocol &prot_;
+  TInputRecursionTracker(TProtocol &prot) : prot_(prot) {
+    prot_.incrementInputRecursionDepth();
+  }
+  ~TInputRecursionTracker() {
+    prot_.decrementInputRecursionDepth();
+  }
+};
+
+/**
+ * Helper template for implementing TProtocol::skip().
+ *
+ * Templatized to avoid having to make virtual function calls.
+ */
+template <class Protocol_>
+uint32_t skip(Protocol_& prot, TType type) {
+  TInputRecursionTracker tracker(prot);
+
+  switch (type) {
+  case T_BOOL: {
+    bool boolv;
+    return prot.readBool(boolv);
+  }
+  case T_BYTE: {
+    int8_t bytev;
+    return prot.readByte(bytev);
+  }
+  case T_I16: {
+    int16_t i16;
+    return prot.readI16(i16);
+  }
+  case T_I32: {
+    int32_t i32;
+    return prot.readI32(i32);
+  }
+  case T_I64: {
+    int64_t i64;
+    return prot.readI64(i64);
+  }
+  case T_DOUBLE: {
+    double dub;
+    return prot.readDouble(dub);
+  }
+  case T_STRING: {
+    std::string str;
+    return prot.readBinary(str);
+  }
+  case T_STRUCT: {
+    uint32_t result = 0;
+    std::string name;
+    int16_t fid;
+    TType ftype;
+    result += prot.readStructBegin(name);
+    while (true) {
+      result += prot.readFieldBegin(name, ftype, fid);
+      if (ftype == T_STOP) {
+        break;
+      }
+      result += skip(prot, ftype);
+      result += prot.readFieldEnd();
+    }
+    result += prot.readStructEnd();
+    return result;
+  }
+  case T_MAP: {
+    uint32_t result = 0;
+    TType keyType;
+    TType valType;
+    uint32_t i, size;
+    result += prot.readMapBegin(keyType, valType, size);
+    for (i = 0; i < size; i++) {
+      result += skip(prot, keyType);
+      result += skip(prot, valType);
+    }
+    result += prot.readMapEnd();
+    return result;
+  }
+  case T_SET: {
+    uint32_t result = 0;
+    TType elemType;
+    uint32_t i, size;
+    result += prot.readSetBegin(elemType, size);
+    for (i = 0; i < size; i++) {
+      result += skip(prot, elemType);
+    }
+    result += prot.readSetEnd();
+    return result;
+  }
+  case T_LIST: {
+    uint32_t result = 0;
+    TType elemType;
+    uint32_t i, size;
+    result += prot.readListBegin(elemType, size);
+    for (i = 0; i < size; i++) {
+      result += skip(prot, elemType);
+    }
+    result += prot.readListEnd();
+    return result;
+  }
+  case T_STOP:
+  case T_VOID:
+  case T_U64:
+  case T_UTF8:
+  case T_UTF16:
+    break;
+  }
+  return 0;
 }
-}
-} // apache::thrift::protocol
+
+}}} // apache::thrift::protocol
 
 #endif // #define _THRIFT_PROTOCOL_TPROTOCOL_H_ 1

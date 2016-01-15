@@ -40,7 +40,7 @@ thrift_CPPFLAGS = -I$(srcdir)/src
 thrift_CXXFLAGS = -Wall -Wextra -Wpedantic -Werror
 thrift_LDADD = \
 	@LEXLIB@ \
-	src/libparse.a src/libparseobjects.a src/libcompilermd5.a \
+	src/libparse.a src/libparseobjects.a src/libcompilermd5.a src/libcompileraudit.a \
 	$(top_builddir)/compiler/cpp/src/generate/libgenerate.a
 
 if HAVE_CPP11
@@ -53,6 +53,7 @@ WINDOWS_DIST = \
              compiler.vcxproj.filters
 
 EXTRA_DIST = \
+             coding_standards.md \
              README.md \
              CMakeLists.txt \
              $(WINDOWS_DIST)

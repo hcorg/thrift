@@ -65,7 +65,7 @@ void IncludesScanner::scanBaseType(const t_base_type* type) {
   case t_base_type::TYPE_STRING:
     stringRequired_ |= true;
     break;
-  case t_base_type::TYPE_BYTE:
+  case t_base_type::TYPE_I8:
   case t_base_type::TYPE_I16:
   case t_base_type::TYPE_I32:
   case t_base_type::TYPE_I64:

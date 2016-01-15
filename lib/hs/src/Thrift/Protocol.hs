@@ -29,6 +29,7 @@ module Thrift.Protocol
     , versionMask
     , version1
     , bsToDouble
+    , bsToDoubleLE
     ) where
 
 import Control.Exception
@@ -101,12 +102,13 @@ getTypeOf v =  case v of
   TI32{} -> T_I32
   TI64{} -> T_I64
   TString{} -> T_STRING
+  TBinary{} -> T_BINARY
   TDouble{} -> T_DOUBLE
 
 runParser :: (Protocol p, Transport t, Show a) => p t -> Parser a -> IO a
 runParser prot p = refill >>= getResult . parse p
   where
-    refill = handle handleEOF $ toStrict <$> tRead (getTransport prot) 1
+    refill = handle handleEOF $ toStrict <$> tReadAll (getTransport prot) 1
     getResult (Done _ a) = return a
     getResult (Partial k) = refill >>= getResult . k
     getResult f = throw $ ProtocolExn PE_INVALID_DATA (show f)
@@ -119,18 +121,22 @@ handleEOF = const $ return mempty
 -- therefore the behavior of this function varies based on whether the local
 -- machine is big endian or little endian.
 bsToDouble :: BS.ByteString -> Double
-bsToDouble bs = unsafeDupablePerformIO $ unsafeUseAsCString bs castBs
-  where
+bsToDoubleLE :: BS.ByteString -> Double
 #if __BYTE_ORDER == __LITTLE_ENDIAN
-    castBs chrPtr = do
-      w <- peek (castPtr chrPtr)
-      poke (castPtr chrPtr) (byteSwap w)
-      peek (castPtr chrPtr)
+bsToDouble bs = unsafeDupablePerformIO $ unsafeUseAsCString bs castBsSwapped
+bsToDoubleLE bs = unsafeDupablePerformIO $ unsafeUseAsCString bs castBs
 #else
-    castBs = peek . castPtr
+bsToDouble bs = unsafeDupablePerformIO $ unsafeUseAsCString bs castBs
+bsToDoubleLE bs = unsafeDupablePerformIO $ unsafeUseAsCString bs castBsSwapped
 #endif
 
-#if __BYTE_ORDER == __LITTLE_ENDIAN
+
+castBsSwapped chrPtr = do
+  w <- peek (castPtr chrPtr)
+  poke (castPtr chrPtr) (byteSwap w)
+  peek (castPtr chrPtr)
+castBs = peek . castPtr
+
 -- | Swap endianness of a 64-bit word
 byteSwap :: Word64 -> Word64
 byteSwap w = (w `shiftL` 56 .&. 0xFF00000000000000) .|.
@@ -141,4 +147,3 @@ byteSwap w = (w `shiftL` 56 .&. 0xFF00000000000000) .|.
              (w `shiftR` 24 .&. 0x0000000000FF0000) .|.
              (w `shiftR` 40 .&. 0x000000000000FF00) .|.
              (w `shiftR` 56 .&. 0x00000000000000FF)
-#endif

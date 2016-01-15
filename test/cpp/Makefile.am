@@ -49,6 +49,8 @@ nodist_libstresstestgencpp_la_SOURCES = \
 
 libstresstestgencpp_la_LIBADD = $(top_builddir)/lib/cpp/libthrift.la
 
+precross: TestServer TestClient
+
 check_PROGRAMS = \
 	TestServer \
 	TestClient \
@@ -67,7 +69,7 @@ TestServer_LDADD = \
 	$(top_builddir)/lib/cpp/libthrift.la \
 	$(top_builddir)/lib/cpp/libthriftz.la \
 	$(top_builddir)/lib/cpp/libthriftnb.la \
-	-levent -lboost_program_options -lboost_system -lboost_filesystem
+	-levent -lboost_program_options -lboost_system -lboost_filesystem $(ZLIB_LIBS)
 
 TestClient_SOURCES = \
 	src/TestClient.cpp
@@ -77,7 +79,7 @@ TestClient_LDADD = \
 	$(top_builddir)/lib/cpp/libthrift.la \
 	$(top_builddir)/lib/cpp/libthriftz.la \
 	$(top_builddir)/lib/cpp/libthriftnb.la \
-	-levent -lboost_program_options -lboost_system -lboost_filesystem
+	-levent -lboost_program_options -lboost_system -lboost_filesystem $(ZLIB_LIBS)
 
 StressTest_SOURCES = \
 	src/StressTest.cpp
@@ -98,10 +100,10 @@ StressTestNonBlocking_LDADD = \
 #
 THRIFT = $(top_builddir)/compiler/cpp/thrift
 
-gen-cpp/ThriftTest.cpp gen-cpp/ThriftTest_types.cpp gen-cpp/ThriftTest_constants.cpp: $(top_srcdir)/test/ThriftTest.thrift
+gen-cpp/ThriftTest.cpp gen-cpp/ThriftTest_types.cpp gen-cpp/ThriftTest_constants.cpp: $(top_srcdir)/test/ThriftTest.thrift $(THRIFT)
 	$(THRIFT) --gen cpp:templates,cob_style -r $<
 
-gen-cpp/StressTest_types.cpp gen-cpp/StressTest_constants.cpp gen-cpp/Service.cpp: $(top_srcdir)/test/StressTest.thrift
+gen-cpp/StressTest_types.cpp gen-cpp/StressTest_constants.cpp gen-cpp/Service.cpp: $(top_srcdir)/test/StressTest.thrift $(THRIFT)
 	$(THRIFT) --gen cpp $<
 
 AM_CPPFLAGS = $(BOOST_CPPFLAGS) $(LIBEVENT_CPPFLAGS) -I$(top_srcdir)/lib/cpp/src -Igen-cpp
@@ -109,7 +111,7 @@ AM_CXXFLAGS = -Wall -Wextra -pedantic
 AM_LDFLAGS = $(BOOST_LDFLAGS) $(LIBEVENT_LDFLAGS) $(ZLIB_LIBS)
 
 clean-local:
-	$(RM) -r gen-cpp
+	$(RM) gen-cpp/*
 
 style-local:
 	$(CPPSTYLE_CMD)

@@ -3,8 +3,8 @@ A set of docker containers used to build and test Apache Thrift
 
 ### Available Containers
 
-* Ubuntu
-* Centos
+* Ubuntu - based on ubuntu:trusty (14.04)
+* Centos - based on centos:6.6
 
 ## Dependencies
 
@@ -15,13 +15,13 @@ From the Apache Thrift code base root
 
 * Build
 
-	docker build -t thrift contrib/docker/ubuntu
+	docker build -t thrift build/docker/ubuntu
 
 	or
 
-	docker build -t thrift contrib/docker/centos
+	docker build -t thrift build/docker/centos
 
 * Run
 
-	docker run -v $(pwd):/thrift -it thrift /bin/bash
+	docker run -v $(pwd):/thrift/src -it thrift /bin/bash
 

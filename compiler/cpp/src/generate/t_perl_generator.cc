@@ -324,7 +324,7 @@ string t_perl_generator::render_const_value(t_type* type, t_const_value* value) 
     case t_base_type::TYPE_BOOL:
       out << (value->get_integer() > 0 ? "1" : "0");
       break;
-    case t_base_type::TYPE_BYTE:
+    case t_base_type::TYPE_I8:
     case t_base_type::TYPE_I16:
     case t_base_type::TYPE_I32:
     case t_base_type::TYPE_I64:
@@ -805,14 +805,27 @@ void t_perl_generator::generate_process_function(t_service* tservice, t_function
                  << perl_namespace((*x_iter)->get_type()->get_program())
                  << (*x_iter)->get_type()->get_name() << "') ){ " << endl;
 
-      if (!tfunction->is_oneway()) {
-        indent_up();
-        f_service_ << indent() << "$result->{" << (*x_iter)->get_name() << "} = $@;" << endl;
-        indent_down();
-        f_service_ << indent();
-      }
+      indent_up();
+      f_service_ << indent() << "$result->{" << (*x_iter)->get_name() << "} = $@;" << endl;
+      f_service_ << indent() << "$@ = undef;" << endl;
+      indent_down();
+      f_service_ << indent();
     }
     f_service_ << "}" << endl;
+
+    // catch-all for unexpected exceptions (THRIFT-3191)
+    f_service_ << indent() << "if ($@) {" << endl;
+    indent_up();
+    f_service_ << indent() << "$@ =~ s/^\\s+|\\s+$//g;" << endl
+               << indent() << "my $err = new TApplicationException(\"Unexpected Exception: \" . $@, TApplicationException::INTERNAL_ERROR);" << endl
+               << indent() << "$output->writeMessageBegin('" << tfunction->get_name() << "', TMessageType::EXCEPTION, $seqid);" << endl
+               << indent() << "$err->write($output);" << endl
+               << indent() << "$output->writeMessageEnd();" << endl
+               << indent() << "$output->getTransport()->flush();" << endl
+               << indent() << "$@ = undef;" << endl
+               << indent() << "return;" << endl;
+    indent_down();
+    f_service_ << indent() << "}" << endl;
   }
 
   // Shortcut out here for oneway functions
@@ -822,11 +835,12 @@ void t_perl_generator::generate_process_function(t_service* tservice, t_function
     f_service_ << "}" << endl;
     return;
   }
-  // Serialize the request header
-  f_service_ << indent() << "$output->writeMessageBegin('" << tfunction->get_name()
-             << "', TMessageType::REPLY, $seqid);" << endl << indent() << "$result->write($output);"
-             << endl << indent() << "$output->writeMessageEnd();" << endl << indent()
-             << "$output->getTransport()->flush();" << endl;
+
+  // Serialize the reply
+  f_service_ << indent() << "$output->writeMessageBegin('" << tfunction->get_name() << "', TMessageType::REPLY, $seqid);" << endl
+             << indent() << "$result->write($output);" << endl
+             << indent() << "$output->writeMessageEnd();" << endl
+             << indent() << "$output->getTransport()->flush();" << endl;
 
   // Close function
   indent_down();
@@ -1165,7 +1179,7 @@ void t_perl_generator::generate_deserialize_field(ofstream& out,
       case t_base_type::TYPE_BOOL:
         out << "readBool(\\$" << name << ");";
         break;
-      case t_base_type::TYPE_BYTE:
+      case t_base_type::TYPE_I8:
         out << "readByte(\\$" << name << ");";
         break;
       case t_base_type::TYPE_I16:
@@ -1218,9 +1232,9 @@ void t_perl_generator::generate_deserialize_container(ofstream& out, t_type* tty
   string etype = tmp("_etype");
 
   t_field fsize(g_type_i32, size);
-  t_field fktype(g_type_byte, ktype);
-  t_field fvtype(g_type_byte, vtype);
-  t_field fetype(g_type_byte, etype);
+  t_field fktype(g_type_i8, ktype);
+  t_field fvtype(g_type_i8, vtype);
+  t_field fetype(g_type_i8, etype);
 
   out << indent() << "my $" << size << " = 0;" << endl;
 
@@ -1356,7 +1370,7 @@ void t_perl_generator::generate_serialize_field(ofstream& out, t_field* tfield, 
       case t_base_type::TYPE_BOOL:
         out << "writeBool($" << name << ");";
         break;
-      case t_base_type::TYPE_BYTE:
+      case t_base_type::TYPE_I8:
         out << "writeByte($" << name << ");";
         break;
       case t_base_type::TYPE_I16:
@@ -1512,7 +1526,7 @@ string t_perl_generator::declare_field(t_field* tfield, bool init, bool obj) {
       case t_base_type::TYPE_BOOL:
         result += " = 0";
         break;
-      case t_base_type::TYPE_BYTE:
+      case t_base_type::TYPE_I8:
       case t_base_type::TYPE_I16:
       case t_base_type::TYPE_I32:
       case t_base_type::TYPE_I64:
@@ -1599,7 +1613,7 @@ string t_perl_generator::type_to_enum(t_type* type) {
       return "TType::STRING";
     case t_base_type::TYPE_BOOL:
       return "TType::BOOL";
-    case t_base_type::TYPE_BYTE:
+    case t_base_type::TYPE_I8:
       return "TType::BYTE";
     case t_base_type::TYPE_I16:
       return "TType::I16";

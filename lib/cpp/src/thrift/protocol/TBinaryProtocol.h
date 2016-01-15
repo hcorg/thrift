@@ -34,16 +34,15 @@ namespace protocol {
  * binary format, essentially just spitting out the raw bytes.
  *
  */
-template <class Transport_>
-class TBinaryProtocolT : public TVirtualProtocol<TBinaryProtocolT<Transport_> > {
-protected:
+template <class Transport_, class ByteOrder_ = TNetworkBigEndian>
+class TBinaryProtocolT : public TVirtualProtocol<TBinaryProtocolT<Transport_, ByteOrder_> > {
+public:
   static const int32_t VERSION_MASK = ((int32_t)0xffff0000);
   static const int32_t VERSION_1 = ((int32_t)0x80010000);
-  // VERSION_2 (0x80020000)  is taken by TDenseProtocol.
+  // VERSION_2 (0x80020000) was taken by TDenseProtocol (which has since been removed)
 
-public:
   TBinaryProtocolT(boost::shared_ptr<Transport_> trans)
-    : TVirtualProtocol<TBinaryProtocolT<Transport_> >(trans),
+    : TVirtualProtocol<TBinaryProtocolT<Transport_, ByteOrder_> >(trans),
       trans_(trans.get()),
       string_limit_(0),
       container_limit_(0),
@@ -55,7 +54,7 @@ public:
                    int32_t container_limit,
                    bool strict_read,
                    bool strict_write)
-    : TVirtualProtocol<TBinaryProtocolT<Transport_> >(trans),
+    : TVirtualProtocol<TBinaryProtocolT<Transport_, ByteOrder_> >(trans),
       trans_(trans.get()),
       string_limit_(string_limit),
       container_limit_(container_limit),
@@ -150,7 +149,7 @@ public:
 
   inline uint32_t readBool(bool& value);
   // Provide the default readBool() implementation for std::vector<bool>
-  using TVirtualProtocol<TBinaryProtocolT<Transport_> >::readBool;
+  using TVirtualProtocol<TBinaryProtocolT<Transport_, ByteOrder_> >::readBool;
 
   inline uint32_t readByte(int8_t& byte);
 
@@ -182,11 +181,12 @@ protected:
 };
 
 typedef TBinaryProtocolT<TTransport> TBinaryProtocol;
+typedef TBinaryProtocolT<TTransport, TNetworkLittleEndian> TLEBinaryProtocol;
 
 /**
  * Constructs binary protocol handlers
  */
-template <class Transport_>
+template <class Transport_, class ByteOrder_ = TNetworkBigEndian>
 class TBinaryProtocolFactoryT : public TProtocolFactory {
 public:
   TBinaryProtocolFactoryT()
@@ -216,17 +216,17 @@ public:
     boost::shared_ptr<Transport_> specific_trans = boost::dynamic_pointer_cast<Transport_>(trans);
     TProtocol* prot;
     if (specific_trans) {
-      prot = new TBinaryProtocolT<Transport_>(specific_trans,
-                                              string_limit_,
-                                              container_limit_,
-                                              strict_read_,
-                                              strict_write_);
+      prot = new TBinaryProtocolT<Transport_, ByteOrder_>(specific_trans,
+                                                          string_limit_,
+                                                          container_limit_,
+                                                          strict_read_,
+                                                          strict_write_);
     } else {
-      prot = new TBinaryProtocol(trans,
-                                 string_limit_,
-                                 container_limit_,
-                                 strict_read_,
-                                 strict_write_);
+      prot = new TBinaryProtocolT<TTransport, ByteOrder_>(trans,
+                                                          string_limit_,
+                                                          container_limit_,
+                                                          strict_read_,
+                                                          strict_write_);
     }
 
     return boost::shared_ptr<TProtocol>(prot);
@@ -240,6 +240,7 @@ private:
 };
 
 typedef TBinaryProtocolFactoryT<TTransport> TBinaryProtocolFactory;
+typedef TBinaryProtocolFactoryT<TTransport, TNetworkLittleEndian> TLEBinaryProtocolFactory;
 }
 }
 } // apache::thrift::protocol

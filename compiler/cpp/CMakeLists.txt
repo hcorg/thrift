@@ -17,15 +17,10 @@
 # under the License.
 #
 
-
-cmake_minimum_required(VERSION 2.8)
-
 # Windows has a different header
 if(MSVC)
-    set(FLEX_FLAGS "--wincompat") # Don't use unistd.h on windows
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/windows/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h)
 else()
-    set(FLEX_FLAGS " ")
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/src/version.h.in ${CMAKE_CURRENT_BINARY_DIR}/version.h)
 endif()
 
@@ -34,7 +29,7 @@ find_package(BISON REQUIRED)
 
 # Create flex and bison files and build the lib parse static library
 BISON_TARGET(thrifty ${CMAKE_CURRENT_SOURCE_DIR}/src/thrifty.yy ${CMAKE_CURRENT_BINARY_DIR}/thrifty.cc)
-FLEX_TARGET(thriftl ${CMAKE_CURRENT_SOURCE_DIR}/src/thriftl.ll ${CMAKE_CURRENT_BINARY_DIR}/thriftl.cc COMPILE_FLAGS ${FLEX_FLAGS})
+FLEX_TARGET(thriftl ${CMAKE_CURRENT_SOURCE_DIR}/src/thriftl.ll ${CMAKE_CURRENT_BINARY_DIR}/thriftl.cc)
 ADD_FLEX_BISON_DEPENDENCY(thriftl thrifty)
 
 # HACK: Work around the fact that bison crates a .hh file but we need a .h file
@@ -52,13 +47,14 @@ set(libparse_SOURCES
 add_library(libparse STATIC ${libparse_SOURCES})
 
 # Create the thrift compiler
-set( thrift_SOURCES 
+set( thrift_SOURCES
     src/main.cc
     src/md5.c
     src/globals.h
     src/main.h
     src/platform.h
     src/md5.h
+    src/audit/t_audit.cpp
     src/parse/t_doc.h
     src/parse/t_type.h
     src/parse/t_base_type.h
@@ -116,6 +112,7 @@ THRIFT_ADD_COMPILER(cpp_v1  "Enable compiler for C++ Version 1" ON)
 THRIFT_ADD_COMPILER(cpp_v2  "Enable compiler for C++ Version 2" ON)
 THRIFT_ADD_COMPILER(java    "Enable compiler for Java"   ON)
 THRIFT_ADD_COMPILER(as3     "Enable compiler for ActionScript 3" ON)
+THRIFT_ADD_COMPILER(dart    "Enable compiler for Dart" ON)
 THRIFT_ADD_COMPILER(haxe    "Enable compiler for Haxe" ON)
 THRIFT_ADD_COMPILER(csharp  "Enable compiler for C#" ON)
 THRIFT_ADD_COMPILER(py      "Enable compiler for Python 2.0" ON)
@@ -124,6 +121,7 @@ THRIFT_ADD_COMPILER(perl    "Enable compiler for Perl" ON)
 THRIFT_ADD_COMPILER(php     "Enable compiler for PHP" ON)
 THRIFT_ADD_COMPILER(erl     "Enable compiler for Erlang" ON)
 THRIFT_ADD_COMPILER(cocoa   "Enable compiler for Cocoa Objective-C" ON)
+THRIFT_ADD_COMPILER(swift   "Enable compiler for Cocoa Swift" ON)
 THRIFT_ADD_COMPILER(st      "Enable compiler for Smalltalk" ON)
 THRIFT_ADD_COMPILER(ocaml   "Enable compiler for OCaml" ON)
 THRIFT_ADD_COMPILER(hs      "Enable compiler for Haskell" ON)

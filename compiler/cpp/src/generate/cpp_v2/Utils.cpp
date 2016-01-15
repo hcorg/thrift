@@ -91,10 +91,10 @@ std::string cpp_v2::getTTypeString(const t_type* type) {
       return "::apache::thrift::protocol::T_VOID";
     case t_base_type::TYPE_BOOL:
       return "::apache::thrift::protocol::T_BOOL";
-    case t_base_type::TYPE_BYTE:
-      return "::apache::thrift::protocol::T_BYTE";
     case t_base_type::TYPE_DOUBLE:
       return "::apache::thrift::protocol::T_DOUBLE";
+    case t_base_type::TYPE_I8:
+      return "::apache::thrift::protocol::T_I8";
     case t_base_type::TYPE_I16:
       return "::apache::thrift::protocol::T_I16";
     case t_base_type::TYPE_I32:
@@ -130,10 +130,10 @@ std::string cpp_v2::getReadWriteSuffix(const t_base_type* type) {
     throw std::string("VOID type in read/write");
   case t_base_type::TYPE_BOOL:
     return "Bool";
-  case t_base_type::TYPE_BYTE:
-    return "Byte";
   case t_base_type::TYPE_DOUBLE:
     return "Double";
+  case t_base_type::TYPE_I8:
+    return "Byte";
   case t_base_type::TYPE_I16:
     return "I16";
   case t_base_type::TYPE_I32:

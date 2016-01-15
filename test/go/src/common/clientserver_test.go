@@ -20,7 +20,7 @@
 package common
 
 import (
-	"code.google.com/p/gomock/gomock"
+	"github.com/golang/mock/gomock"
 	"errors"
 	"gen/thrifttest"
 	"reflect"
@@ -56,7 +56,7 @@ func doUnit(t *testing.T, unit *test_unit) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	handler := NewMockThriftTest(ctrl)
-	server, err := StartServer(unit.host, unit.port, unit.domain_socket, unit.transport, unit.protocol, unit.ssl, handler)
+	server, err := StartServer(unit.host, unit.port, unit.domain_socket, unit.transport, unit.protocol, unit.ssl, "../../../keys", handler)
 	if err != nil {
 		t.Errorf("Unable to start server", err)
 		t.FailNow()
@@ -89,6 +89,8 @@ func callEverythingWithMock(t *testing.T, client *thrifttest.ThriftTestClient, h
 	gomock.InOrder(
 		handler.EXPECT().TestVoid(),
 		handler.EXPECT().TestString("thing").Return("thing", nil),
+		handler.EXPECT().TestBool(true).Return(true, nil),
+		handler.EXPECT().TestBool(false).Return(false, nil),
 		handler.EXPECT().TestByte(int8(42)).Return(int8(42), nil),
 		handler.EXPECT().TestI32(int32(4242)).Return(int32(4242), nil),
 		handler.EXPECT().TestI64(int64(424242)).Return(int64(424242), nil),
@@ -103,7 +105,7 @@ func callEverythingWithMock(t *testing.T, client *thrifttest.ThriftTestClient, h
 		handler.EXPECT().TestEnum(thrifttest.Numberz_TWO).Return(thrifttest.Numberz_TWO, nil),
 		handler.EXPECT().TestTypedef(thrifttest.UserId(42)).Return(thrifttest.UserId(42), nil),
 		handler.EXPECT().TestMapMap(int32(42)).Return(rmapmap, nil),
-		//not testing insanity
+		// TODO: not testing insanity
 		handler.EXPECT().TestMulti(int8(42), int32(4242), int64(424242), map[int16]string{1: "blah", 2: "thing"}, thrifttest.Numberz_EIGHT, thrifttest.UserId(24)).Return(xxs, nil),
 		handler.EXPECT().TestException("some").Return(xcept),
 		handler.EXPECT().TestException("TException").Return(errors.New("Just random exception")),
@@ -123,6 +125,21 @@ func callEverythingWithMock(t *testing.T, client *thrifttest.ThriftTestClient, h
 	}
 	if thing != "thing" {
 		t.Errorf("Unexpected TestString() result, expected 'thing' got '%s' ", thing)
+	}
+
+	bl, err := client.TestBool(true)
+	if err != nil {
+		t.Errorf("Unexpected error in TestBool() call: ", err)
+	}
+	if !bl {
+		t.Errorf("Unexpected TestBool() result expected true, got %f ", bl)
+	}
+	bl, err = client.TestBool(false)
+	if err != nil {
+		t.Errorf("Unexpected error in TestBool() call: ", err)
+	}
+	if bl {
+		t.Errorf("Unexpected TestBool() result expected false, got %f ", bl)
 	}
 
 	b, err := client.TestByte(42)

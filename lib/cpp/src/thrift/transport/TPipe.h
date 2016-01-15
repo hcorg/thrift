@@ -25,7 +25,13 @@
 #ifndef _WIN32
 #include <thrift/transport/TSocket.h>
 #endif
+#ifdef _WIN32
+#include <thrift/windows/Sync.h>
+#endif
 #include <boost/noncopyable.hpp>
+#ifdef _WIN32
+#include <thrift/windows/Sync.h>
+#endif
 
 namespace apache {
 namespace thrift {
@@ -45,7 +51,8 @@ public:
   // Constructs a new pipe object.
   TPipe();
   // Named pipe constructors -
-  explicit TPipe(HANDLE Pipe); // HANDLE is a void*
+  explicit TPipe(HANDLE Pipe);       // HANDLE is a void*
+  explicit TPipe(TAutoHandle& Pipe); // this ctor will clear out / move from Pipe
   // need a const char * overload so string literals don't go to the HANDLE overload
   explicit TPipe(const char* pipename);
   explicit TPipe(const std::string& pipename);
@@ -80,8 +87,8 @@ public:
   void setPipeHandle(HANDLE pipehandle);
   HANDLE getWrtPipeHandle();
   void setWrtPipeHandle(HANDLE pipehandle);
-  long getConnectTimeout();
-  void setConnectTimeout(long seconds);
+  long getConnTimeout();
+  void setConnTimeout(long seconds);
 
   // this function is intended to be used in generic / template situations,
   // so its name needs to be the same as TPipeServer's

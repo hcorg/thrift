@@ -62,6 +62,7 @@ libgenerate_a_SOURCES += \
 	t_cpp_v1_generator.h \
 	t_csharp_generator.cc \
 	t_d_generator.cc \
+	t_dart_generator.cc \
 	t_delphi_generator.cc \
 	t_erl_generator.cc \
 	t_go_generator.cc \
@@ -81,6 +82,7 @@ libgenerate_a_SOURCES += \
 	t_py_generator.cc \
 	t_rb_generator.cc \
 	t_st_generator.cc \
+	t_swift_generator.cc \
 	t_xsd_generator.cc
 
 if HAVE_CPP11

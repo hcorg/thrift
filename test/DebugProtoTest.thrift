@@ -20,6 +20,7 @@
 namespace c_glib TTest
 namespace cpp thrift.test.debug
 namespace java thrift.test
+namespace rb thrift.test
 
 struct Doubles {
  1: double nan,
@@ -61,7 +62,7 @@ struct Nesting {
 
 struct HolyMoley {
   1: list<OneOfEach> big,
-  2: set<list<string>> contain,
+  2: set<list<string> (python.immutable = "")> contain,
   3: map<string,list<Bonk>> bonks,
 }
 
@@ -71,11 +72,15 @@ struct Backwards {
 }
 
 struct Empty {
-}
+} (
+  python.immutable = "",
+)
 
 struct Wrapper {
   1: Empty foo
-}
+} (
+  python.immutable = "",
+)
 
 struct RandomStuff {
   1: i32 a,
@@ -152,9 +157,9 @@ struct CompactProtoTestStruct {
   42: map<byte, binary>           byte_binary_map;
   43: map<byte, bool>             byte_boolean_map;
   // collections as keys
-  44: map<list<byte>, byte>       list_byte_map;
-  45: map<set<byte>, byte>        set_byte_map;
-  46: map<map<byte,byte>, byte>   map_byte_map;
+  44: map<list<byte> (python.immutable = ""), byte>       list_byte_map;
+  45: map<set<byte> (python.immutable = ""), byte>        set_byte_map;
+  46: map<map<byte,byte> (python.immutable = ""), byte>   map_byte_map;
   // collections as values
   47: map<byte, map<byte,byte>>   byte_map_map;
   48: map<byte, set<byte>>        byte_set_map;
@@ -254,10 +259,10 @@ service EmptyService {}
 // The only purpose of this thing is to increase the size of the generated code
 // so that ZlibTest has more highly compressible data to play with.
 struct BlowUp {
-  1: map<list<i32>,set<map<i32,string>>> b1;
-  2: map<list<i32>,set<map<i32,string>>> b2;
-  3: map<list<i32>,set<map<i32,string>>> b3;
-  4: map<list<i32>,set<map<i32,string>>> b4;
+  1: map<list<i32>(python.immutable = ""),set<map<i32,string> (python.immutable = "")>> b1;
+  2: map<list<i32>(python.immutable = ""),set<map<i32,string> (python.immutable = "")>> b2;
+  3: map<list<i32>(python.immutable = ""),set<map<i32,string> (python.immutable = "")>> b3;
+  4: map<list<i32>(python.immutable = ""),set<map<i32,string> (python.immutable = "")>> b4;
 }
 
 
@@ -364,4 +369,8 @@ struct TupleProtocolTestStruct {
   optional i32 field10;
   optional i32 field11;
   optional i32 field12;
+}
+
+struct ListDoublePerf {
+  1: list<double> field;
 }

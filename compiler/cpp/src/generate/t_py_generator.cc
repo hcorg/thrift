@@ -54,25 +54,50 @@ public:
     std::map<std::string, std::string>::const_iterator iter;
 
     iter = parsed_options.find("new_style");
-    gen_newstyle_ = (iter != parsed_options.end());
+    if (iter != parsed_options.end()) {
+      pwarning(0, "new_style is enabled by default, so the option will be removed in the near future.\n");
+    }
+    iter = parsed_options.find("utf8strings");
+    if (iter != parsed_options.end()) {
+      pwarning(0, "utf8strings is enabled by default, so the option will be removed in the near future.\n");
+    }
+
+    gen_newstyle_ = true;
+    iter = parsed_options.find("old_style");
+    if (iter != parsed_options.end()) {
+      gen_newstyle_ = false;
+      pwarning(0, "old_style is deprecated and may be removed in the future.\n");
+    }
 
     iter = parsed_options.find("slots");
     gen_slots_ = (iter != parsed_options.end());
+
+    iter = parsed_options.find("package_prefix");
+    if (iter != parsed_options.end()) {
+      package_prefix_ = iter->second;
+    }
+
 
     iter = parsed_options.find("dynamic");
     gen_dynamic_ = (iter != parsed_options.end());
 
     if (gen_dynamic_) {
-      gen_newstyle_ = 0; // dynamic is newstyle
+      gen_newstyle_ = false; // dynamic is newstyle
       gen_dynbaseclass_ = "TBase";
+      gen_dynbaseclass_frozen_ = "TFrozenBase";
       gen_dynbaseclass_exc_ = "TExceptionBase";
-      import_dynbase_ = "from thrift.protocol.TBase import TBase, TExceptionBase\n";
+      import_dynbase_ = "from thrift.protocol.TBase import TBase, TFrozenBase, TExceptionBase, TTransport\n";
     }
 
     iter = parsed_options.find("dynbase");
     if (iter != parsed_options.end()) {
       gen_dynbase_ = true;
       gen_dynbaseclass_ = (iter->second);
+    }
+
+    iter = parsed_options.find("dynfrozen");
+    if (iter != parsed_options.end()) {
+      gen_dynbaseclass_frozen_ = (iter->second);
     }
 
     iter = parsed_options.find("dynexc");
@@ -96,8 +121,13 @@ public:
       throw "at most one of 'twisted' and 'tornado' are allowed";
     }
 
-    iter = parsed_options.find("utf8strings");
-    gen_utf8strings_ = (iter != parsed_options.end());
+    iter = parsed_options.find("no_utf8strings");
+    gen_utf8strings_ = (iter == parsed_options.end());
+
+    iter = parsed_options.find("coding");
+    if (iter != parsed_options.end()) {
+        coding_ = iter->second;
+    }
 
     copy_options_ = option_string;
 
@@ -137,8 +167,7 @@ public:
   void generate_py_struct(t_struct* tstruct, bool is_exception);
   void generate_py_struct_definition(std::ofstream& out,
                                      t_struct* tstruct,
-                                     bool is_xception = false,
-                                     bool is_result = false);
+                                     bool is_xception = false);
   void generate_py_struct_reader(std::ofstream& out, t_struct* tstruct);
   void generate_py_struct_writer(std::ofstream& out, t_struct* tstruct);
   void generate_py_struct_required_validator(std::ofstream& out, t_struct* tstruct);
@@ -161,8 +190,7 @@ public:
 
   void generate_deserialize_field(std::ofstream& out,
                                   t_field* tfield,
-                                  std::string prefix = "",
-                                  bool inclass = false);
+                                  std::string prefix = "");
 
   void generate_deserialize_struct(std::ofstream& out, t_struct* tstruct, std::string prefix = "");
 
@@ -224,7 +252,7 @@ public:
     return sub_namespace == "twisted";
   }
 
-  static std::string get_real_py_module(const t_program* program, bool gen_twisted) {
+  static std::string get_real_py_module(const t_program* program, bool gen_twisted, std::string package_dir="") {
     if (gen_twisted) {
       std::string twisted_module = program->get_namespace("py.twisted");
       if (!twisted_module.empty()) {
@@ -236,10 +264,15 @@ public:
     if (real_module.empty()) {
       return program->get_name();
     }
-    return real_module;
+    return package_dir + real_module;
+  }
+
+  static bool is_immutable(t_type* ttype) {
+    return ttype->annotations_.find("python.immutable") != ttype->annotations_.end();
   }
 
 private:
+
   /**
    * True if we should generate new-style classes.
    */
@@ -252,6 +285,7 @@ private:
 
   bool gen_dynbase_;
   std::string gen_dynbaseclass_;
+  std::string gen_dynbaseclass_frozen_;
   std::string gen_dynbaseclass_exc_;
 
   std::string import_dynbase_;
@@ -274,6 +308,14 @@ private:
    * True if strings should be encoded using utf-8.
    */
   bool gen_utf8strings_;
+
+  /**
+   * specify generated file encoding
+   * eg. # -*- coding: utf-8 -*-
+   */
+  string coding_;
+
+  string package_prefix_;
 
   /**
    * File streams
@@ -338,11 +380,16 @@ void t_py_generator::init_generator() {
   f_init.close();
 
   // Print header
-  f_types_ << py_autogen_comment() << endl << py_imports() << endl << render_includes() << endl
-           << render_fastbinary_includes() << endl << endl;
+  f_types_ <<
+    py_autogen_comment() << endl <<
+    py_imports() << endl <<
+    render_includes() << endl <<
+    render_fastbinary_includes();
 
-  f_consts_ << py_autogen_comment() << endl << py_imports() << endl << "from ttypes import *"
-            << endl << endl;
+  f_consts_ <<
+    py_autogen_comment() << endl <<
+    py_imports() << endl <<
+    "from .ttypes import *" << endl;
 }
 
 /**
@@ -352,10 +399,7 @@ string t_py_generator::render_includes() {
   const vector<t_program*>& includes = program_->get_includes();
   string result = "";
   for (size_t i = 0; i < includes.size(); ++i) {
-    result += "import " + get_real_py_module(includes[i], gen_twisted_) + ".ttypes\n";
-  }
-  if (includes.size() > 0) {
-    result += "\n";
+    result += "import " + get_real_py_module(includes[i], gen_twisted_, package_prefix_) + ".ttypes\n";
   }
   return result;
 }
@@ -382,7 +426,11 @@ string t_py_generator::render_fastbinary_includes() {
  * Autogen'd comment
  */
 string t_py_generator::py_autogen_comment() {
-  return std::string("#\n") + "# Autogenerated by Thrift Compiler (" + THRIFT_VERSION + ")\n"
+  string coding;
+  if (!coding_.empty()) {
+      coding = "# -*- coding: " + coding_ + " -*-\n";
+  }
+  return coding + std::string("#\n") + "# Autogenerated by Thrift Compiler (" + THRIFT_VERSION + ")\n"
          + "#\n" + "# DO NOT EDIT UNLESS YOU ARE SURE THAT YOU KNOW WHAT YOU ARE DOING\n" + "#\n"
          + "#  options string: " + copy_options_ + "\n" + "#\n";
 }
@@ -391,7 +439,9 @@ string t_py_generator::py_autogen_comment() {
  * Prints standard thrift imports
  */
 string t_py_generator::py_imports() {
-  return string("from thrift.Thrift import TType, TMessageType, TException, TApplicationException");
+  return gen_utf8strings_
+    ? string("from thrift.Thrift import TType, TMessageType, TFrozenDict, TException, TApplicationException\nimport sys")
+    : string("from thrift.Thrift import TType, TMessageType, TFrozenDict, TException, TApplicationException");
 }
 
 /**
@@ -421,7 +471,7 @@ void t_py_generator::generate_typedef(t_typedef* ttypedef) {
 void t_py_generator::generate_enum(t_enum* tenum) {
   std::ostringstream to_string_mapping, from_string_mapping;
 
-  f_types_ << "class " << tenum->get_name() << (gen_newstyle_ ? "(object)" : "")
+  f_types_ << endl << endl << "class " << tenum->get_name() << (gen_newstyle_ ? "(object)" : "")
            << (gen_dynamic_ ? "(" + gen_dynbaseclass_ + ")" : "") << ":" << endl;
   indent_up();
   generate_python_docstring(f_types_, tenum);
@@ -446,7 +496,7 @@ void t_py_generator::generate_enum(t_enum* tenum) {
 
   indent_down();
   f_types_ << endl;
-  f_types_ << to_string_mapping.str() << endl << from_string_mapping.str() << endl;
+  f_types_ << to_string_mapping.str() << endl << from_string_mapping.str();
 }
 
 /**
@@ -479,7 +529,7 @@ string t_py_generator::render_const_value(t_type* type, t_const_value* value) {
     case t_base_type::TYPE_BOOL:
       out << (value->get_integer() > 0 ? "True" : "False");
       break;
-    case t_base_type::TYPE_BYTE:
+    case t_base_type::TYPE_I8:
     case t_base_type::TYPE_I16:
     case t_base_type::TYPE_I32:
     case t_base_type::TYPE_I64:
@@ -525,6 +575,9 @@ string t_py_generator::render_const_value(t_type* type, t_const_value* value) {
   } else if (type->is_map()) {
     t_type* ktype = ((t_map*)type)->get_key_type();
     t_type* vtype = ((t_map*)type)->get_val_type();
+    if (is_immutable(type)) {
+      out << "TFrozenDict(";
+    }
     out << "{" << endl;
     indent_up();
     const map<t_const_value*, t_const_value*>& val = value->get_map();
@@ -538,6 +591,9 @@ string t_py_generator::render_const_value(t_type* type, t_const_value* value) {
     }
     indent_down();
     indent(out) << "}";
+    if (is_immutable(type)) {
+      out << ")";
+    }
   } else if (type->is_list() || type->is_set()) {
     t_type* etype;
     if (type->is_list()) {
@@ -546,9 +602,16 @@ string t_py_generator::render_const_value(t_type* type, t_const_value* value) {
       etype = ((t_set*)type)->get_elem_type();
     }
     if (type->is_set()) {
+      if (is_immutable(type)) {
+        out << "frozen";
+      }
       out << "set(";
     }
-    out << "[" << endl;
+    if (is_immutable(type) || type->is_set()) {
+      out << "(" << endl;
+    } else {
+      out << "[" << endl;
+    }
     indent_up();
     const vector<t_const_value*>& val = value->get_list();
     vector<t_const_value*>::const_iterator v_iter;
@@ -558,7 +621,11 @@ string t_py_generator::render_const_value(t_type* type, t_const_value* value) {
       out << "," << endl;
     }
     indent_down();
-    indent(out) << "]";
+    if (is_immutable(type) || type->is_set()) {
+      indent(out) << ")";
+    } else {
+      indent(out) << "]";
+    }
     if (type->is_set()) {
       out << ")";
     }
@@ -600,26 +667,26 @@ void t_py_generator::generate_py_struct(t_struct* tstruct, bool is_exception) {
  */
 void t_py_generator::generate_py_struct_definition(ofstream& out,
                                                    t_struct* tstruct,
-                                                   bool is_exception,
-                                                   bool is_result) {
-  (void)is_result;
+                                                   bool is_exception) {
   const vector<t_field*>& members = tstruct->get_members();
   const vector<t_field*>& sorted_members = tstruct->get_sorted_members();
   vector<t_field*>::const_iterator m_iter;
 
-  out << std::endl << "class " << tstruct->get_name();
+  out << endl << endl << "class " << tstruct->get_name();
   if (is_exception) {
     if (gen_dynamic_) {
       out << "(" << gen_dynbaseclass_exc_ << ")";
     } else {
       out << "(TException)";
     }
-  } else {
-    if (gen_newstyle_) {
-      out << "(object)";
-    } else if (gen_dynamic_) {
+  } else if (gen_dynamic_) {
+    if (is_immutable(tstruct)) {
+      out << "(" << gen_dynbaseclass_frozen_ << ")";
+    } else  {
       out << "(" << gen_dynbaseclass_ << ")";
     }
+  } else if (gen_newstyle_) {
+    out << "(object)";
   }
   out << ":" << endl;
   indent_up();
@@ -648,13 +715,13 @@ void t_py_generator::generate_py_struct_definition(ofstream& out,
   */
 
   if (gen_slots_) {
-    indent(out) << "__slots__ = [ " << endl;
+    indent(out) << "__slots__ = (" << endl;
     indent_up();
     for (m_iter = sorted_members.begin(); m_iter != sorted_members.end(); ++m_iter) {
       indent(out) << "'" << (*m_iter)->get_name() << "'," << endl;
     }
     indent_down();
-    indent(out) << " ]" << endl << endl;
+    indent(out) << ")" << endl << endl;
   }
 
   // TODO(dreiss): Look into generating an empty tuple instead of None
@@ -669,7 +736,7 @@ void t_py_generator::generate_py_struct_definition(ofstream& out,
     for (m_iter = sorted_members.begin(); m_iter != sorted_members.end(); ++m_iter) {
 
       for (; sorted_keys_pos != (*m_iter)->get_key(); sorted_keys_pos++) {
-        indent(out) << "None, # " << sorted_keys_pos << endl;
+        indent(out) << "None,  # " << sorted_keys_pos << endl;
       }
 
       indent(out) << "(" << (*m_iter)->get_key() << ", " << type_to_enum((*m_iter)->get_type())
@@ -678,16 +745,17 @@ void t_py_generator::generate_py_struct_definition(ofstream& out,
                   << ", " << type_to_spec_args((*m_iter)->get_type()) << ", "
                   << render_field_default_value(*m_iter) << ", "
                   << "),"
-                  << " # " << sorted_keys_pos << endl;
+                  << "  # " << sorted_keys_pos << endl;
 
       sorted_keys_pos++;
     }
 
     indent_down();
-    indent(out) << ")" << endl << endl;
+    indent(out) << ")" << endl;
   } else {
     indent(out) << "thrift_spec = None" << endl;
   }
+  out << endl;
 
   if (members.size() > 0) {
     out << indent() << "def __init__(self,";
@@ -707,15 +775,48 @@ void t_py_generator::generate_py_struct_definition(ofstream& out,
       if (!type->is_base_type() && !type->is_enum() && (*m_iter)->get_value() != NULL) {
         indent(out) << "if " << (*m_iter)->get_name() << " is "
                     << "self.thrift_spec[" << (*m_iter)->get_key() << "][4]:" << endl;
-        indent(out) << "  " << (*m_iter)->get_name() << " = " << render_field_default_value(*m_iter)
+        indent_up();
+        indent(out) << (*m_iter)->get_name() << " = " << render_field_default_value(*m_iter)
                     << endl;
+        indent_down();
       }
-      indent(out) << "self." << (*m_iter)->get_name() << " = " << (*m_iter)->get_name() << endl;
+
+      if (is_immutable(tstruct)) {
+        if (gen_newstyle_ || gen_dynamic_) {
+          indent(out) << "super(" << tstruct->get_name() << ", self).__setattr__('"
+                      << (*m_iter)->get_name() << "', " << (*m_iter)->get_name() << ")" << endl;
+        } else {
+          indent(out) << "self.__dict__['" << (*m_iter)->get_name()
+                      << "'] = " << (*m_iter)->get_name() << endl;
+        }
+      } else {
+        indent(out) << "self." << (*m_iter)->get_name() << " = " << (*m_iter)->get_name() << endl;
+      }
     }
 
     indent_down();
 
     out << endl;
+  }
+
+  if (is_immutable(tstruct)) {
+    out << indent() << "def __setattr__(self, *args):" << endl
+        << indent() << "  raise TypeError(\"can't modify immutable instance\")" << endl
+        << endl;
+    out << indent() << "def __delattr__(self, *args):" << endl
+        << indent() << "  raise TypeError(\"can't modify immutable instance\")" << endl
+        << endl;
+
+    // Hash all of the members in order, and also hash in the class
+    // to avoid collisions for stuff like single-field structures.
+    out << indent() << "def __hash__(self):" << endl
+        << indent() << "  return hash(self.__class__) ^ hash((";
+
+    for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
+      out << "self." << (*m_iter)->get_name() << ", ";
+    }
+
+    out << "))" << endl << endl;
   }
 
   if (!gen_dynamic_) {
@@ -731,23 +832,15 @@ void t_py_generator::generate_py_struct_definition(ofstream& out,
         << endl;
   }
 
-  out << indent() << "def __hash__(self):" << endl;
-  indent_up();
-  indent(out) << "value = 17" << endl; // PYTHONHASHSEED would be better, but requires Python 3.2.3
-  for (m_iter = members.begin(); m_iter != members.end(); ++m_iter) {
-    indent(out) << "value = (value * 31) ^ hash(self." << (*m_iter)->get_name() + ")" << endl;
-  }
-  indent(out) << "return value" << endl;
-  indent_down();
-  out << endl;
-
   if (!gen_slots_) {
     // Printing utilities so that on the command line thrift
     // structs look pretty like dictionaries
-    out << indent() << "def __repr__(self):" << endl << indent() << "  L = ['%s=%r' % (key, value)"
-        << endl << indent() << "    for key, value in self.__dict__.iteritems()]" << endl
-        << indent() << "  return '%s(%s)' % (self.__class__.__name__, ', '.join(L))" << endl
-        << endl;
+    out <<
+      indent() << "def __repr__(self):" << endl <<
+      indent() << "  L = ['%s=%r' % (key, value)" << endl <<
+      indent() << "       for key, value in self.__dict__.items()]" << endl <<
+      indent() << "  return '%s(%s)' % (self.__class__.__name__, ', '.join(L))" << endl <<
+      endl;
 
     // Equality and inequality methods that compare by value
     out << indent() << "def __eq__(self, other):" << endl;
@@ -780,7 +873,7 @@ void t_py_generator::generate_py_struct_definition(ofstream& out,
         << indent() << "  return True" << endl << endl;
 
     out << indent() << "def __ne__(self, other):" << endl << indent()
-        << "  return not (self == other)" << endl << endl;
+        << "  return not (self == other)" << endl;
   }
   indent_down();
 }
@@ -792,18 +885,30 @@ void t_py_generator::generate_py_struct_reader(ofstream& out, t_struct* tstruct)
   const vector<t_field*>& fields = tstruct->get_members();
   vector<t_field*>::const_iterator f_iter;
 
-  indent(out) << "def read(self, iprot):" << endl;
+  if (is_immutable(tstruct)) {
+    out << indent() << "@classmethod" << endl << indent() << "def read(cls, iprot):" << endl;
+  } else {
+    indent(out) << "def read(self, iprot):" << endl;
+  }
   indent_up();
+
+  const char* id = is_immutable(tstruct) ? "cls" : "self";
 
   indent(out) << "if iprot.__class__ == TBinaryProtocol.TBinaryProtocolAccelerated "
                  "and isinstance(iprot.trans, TTransport.CReadableTransport) "
-                 "and self.thrift_spec is not None "
+                 "and " << id << ".thrift_spec is not None "
                  "and fastbinary is not None:" << endl;
   indent_up();
 
-  indent(out) << "fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec))"
-              << endl;
-  indent(out) << "return" << endl;
+  if (is_immutable(tstruct)) {
+    indent(out)
+        << "return fastbinary.decode_binary(None, iprot.trans, (cls, cls.thrift_spec), iprot.string_length_limit, iprot.container_length_limit)"
+        << endl;
+  } else {
+    indent(out) << "fastbinary.decode_binary(self, iprot.trans, (self.__class__, self.thrift_spec), iprot.string_length_limit, iprot.container_length_limit)"
+                << endl;
+    indent(out) << "return" << endl;
+  }
   indent_down();
 
   indent(out) << "iprot.readStructBegin()" << endl;
@@ -836,7 +941,11 @@ void t_py_generator::generate_py_struct_reader(ofstream& out, t_struct* tstruct)
     indent_up();
     indent(out) << "if ftype == " << type_to_enum((*f_iter)->get_type()) << ":" << endl;
     indent_up();
-    generate_deserialize_field(out, *f_iter, "self.");
+    if (is_immutable(tstruct)) {
+      generate_deserialize_field(out, *f_iter);
+    } else {
+      generate_deserialize_field(out, *f_iter, "self.");
+    }
     indent_down();
     out << indent() << "else:" << endl << indent() << "  iprot.skip(ftype)" << endl;
     indent_down();
@@ -851,6 +960,16 @@ void t_py_generator::generate_py_struct_reader(ofstream& out, t_struct* tstruct)
   indent_down();
 
   indent(out) << "iprot.readStructEnd()" << endl;
+
+  if (is_immutable(tstruct)) {
+    indent(out) << "return cls(" << endl;
+    indent_up();
+    for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
+      indent(out) << (*f_iter)->get_name() << "=" << (*f_iter)->get_name() << "," << endl;
+    }
+    indent_down();
+    indent(out) << ")" << endl;
+  }
 
   indent_down();
   out << endl;
@@ -902,7 +1021,6 @@ void t_py_generator::generate_py_struct_writer(ofstream& out, t_struct* tstruct)
 
   indent_down();
   generate_py_struct_required_validator(out, tstruct);
-  out << endl;
 }
 
 void t_py_generator::generate_py_struct_required_validator(ofstream& out, t_struct* tstruct) {
@@ -941,12 +1059,14 @@ void t_py_generator::generate_service(t_service* tservice) {
 
   if (tservice->get_extends() != NULL) {
     f_service_ << "import "
-               << get_real_py_module(tservice->get_extends()->get_program(), gen_twisted_) << "."
+               << get_real_py_module(tservice->get_extends()->get_program(), gen_twisted_, package_prefix_) << "."
                << tservice->get_extends()->get_name() << endl;
   }
 
-  f_service_ << "from ttypes import *" << endl << "from thrift.Thrift import TProcessor" << endl
-             << render_fastbinary_includes() << endl;
+  f_service_ << "import logging" << endl
+             << "from .ttypes import *" << endl
+             << "from thrift.Thrift import TProcessor" << endl
+             << render_fastbinary_includes();
 
   if (gen_twisted_) {
     f_service_ << "from zope.interface import Interface, implements" << endl
@@ -957,8 +1077,6 @@ void t_py_generator::generate_service(t_service* tservice) {
     f_service_ << "from tornado import concurrent" << endl;
     f_service_ << "from thrift.transport import TTransport" << endl;
   }
-
-  f_service_ << endl;
 
   // Generate the three main parts of the service
   generate_service_interface(tservice);
@@ -980,7 +1098,7 @@ void t_py_generator::generate_service_helpers(t_service* tservice) {
   vector<t_function*> functions = tservice->get_functions();
   vector<t_function*>::iterator f_iter;
 
-  f_service_ << "# HELPER FUNCTIONS AND STRUCTURES" << endl;
+  f_service_ << endl << "# HELPER FUNCTIONS AND STRUCTURES" << endl;
 
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
     t_struct* ts = (*f_iter)->get_arglist();
@@ -1008,7 +1126,7 @@ void t_py_generator::generate_py_function_helpers(t_function* tfunction) {
     for (f_iter = fields.begin(); f_iter != fields.end(); ++f_iter) {
       result.append(*f_iter);
     }
-    generate_py_struct_definition(f_service_, &result, false, true);
+    generate_py_struct_definition(f_service_, &result, false);
   }
 }
 
@@ -1031,7 +1149,7 @@ void t_py_generator::generate_service_interface(t_service* tservice) {
     }
   }
 
-  f_service_ << "class Iface" << extends_if << ":" << endl;
+  f_service_ << endl << endl << "class Iface" << extends_if << ":" << endl;
   indent_up();
   generate_python_docstring(f_service_, tservice);
   vector<t_function*> functions = tservice->get_functions();
@@ -1039,17 +1157,22 @@ void t_py_generator::generate_service_interface(t_service* tservice) {
     f_service_ << indent() << "pass" << endl;
   } else {
     vector<t_function*>::iterator f_iter;
+    bool first = true;
     for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
+      if (first) {
+        first = false;
+      } else {
+        f_service_ << endl;
+      }
       f_service_ << indent() << "def " << function_signature(*f_iter, true) << ":" << endl;
       indent_up();
       generate_python_docstring(f_service_, (*f_iter));
-      f_service_ << indent() << "pass" << endl << endl;
+      f_service_ << indent() << "pass" << endl;
       indent_down();
     }
   }
 
   indent_down();
-  f_service_ << endl;
 }
 
 /**
@@ -1073,6 +1196,8 @@ void t_py_generator::generate_service_client(t_service* tservice) {
     }
   }
 
+  f_service_ << endl << endl;
+
   if (gen_twisted_) {
     f_service_ << "class Client" << extends_client << ":" << endl << "  implements(Iface)" << endl
                << endl;
@@ -1095,7 +1220,7 @@ void t_py_generator::generate_service_client(t_service* tservice) {
     if (gen_twisted_) {
       f_service_ << indent() << "  self._transport = transport" << endl << indent()
                  << "  self._oprot_factory = oprot_factory" << endl << indent()
-                 << "  self._seqid = 0" << endl << indent() << "  self._reqs = {}" << endl << endl;
+                 << "  self._seqid = 0" << endl << indent() << "  self._reqs = {}" << endl;
     } else if (gen_tornado_) {
       f_service_ << indent() << "  self._transport = transport" << endl << indent()
                  << "  self._iprot_factory = iprot_factory" << endl << indent()
@@ -1103,47 +1228,50 @@ void t_py_generator::generate_service_client(t_service* tservice) {
                  << indent() << "                         else iprot_factory)" << endl << indent()
                  << "  self._seqid = 0" << endl << indent() << "  self._reqs = {}" << endl
                  << indent() << "  self._transport.io_loop.spawn_callback(self._start_receiving)"
-                 << endl << endl;
+                 << endl;
     } else {
       f_service_ << indent() << "  self._iprot = self._oprot = iprot" << endl << indent()
                  << "  if oprot is not None:" << endl << indent() << "    self._oprot = oprot"
-                 << endl << indent() << "  self._seqid = 0" << endl << endl;
+                 << endl << indent() << "  self._seqid = 0" << endl;
     }
   } else {
     if (gen_twisted_) {
       f_service_ << indent() << "  " << extends
-                 << ".Client.__init__(self, transport, oprot_factory)" << endl << endl;
+                 << ".Client.__init__(self, transport, oprot_factory)" << endl;
     } else if (gen_tornado_) {
       f_service_ << indent() << "  " << extends
-                 << ".Client.__init__(self, transport, iprot_factory, oprot_factory)" << endl
-                 << endl;
+                 << ".Client.__init__(self, transport, iprot_factory, oprot_factory)" << endl;
     } else {
-      f_service_ << indent() << "  " << extends << ".Client.__init__(self, iprot, oprot)" << endl
-                 << endl;
+      f_service_ << indent() << "  " << extends << ".Client.__init__(self, iprot, oprot)" << endl;
     }
   }
 
   if (gen_tornado_ && extends.empty()) {
-    f_service_ << indent() << "@gen.engine" << endl << indent()
-               << "def _start_receiving(self):" << endl << indent() << "  while True:" << endl
-               << indent() << "    try:" << endl << indent()
-               << "      frame = yield self._transport.readFrame()" << endl << indent()
-               << "    except TTransport.TTransportException as e:" << endl << indent()
-               << "      for future in self._reqs.itervalues():" << endl << indent()
-               << "        future.set_exception(e)" << endl << indent() << "      self._reqs = {}"
-               << endl << indent() << "      return" << endl << indent()
-               << "    tr = TTransport.TMemoryBuffer(frame)" << endl << indent()
-               << "    iprot = self._iprot_factory.getProtocol(tr)" << endl << indent()
-               << "    (fname, mtype, rseqid) = iprot.readMessageBegin()" << endl << indent()
-               << "    future = self._reqs.pop(rseqid, None)" << endl << indent()
-               << "    if not future:" << endl << indent()
-               << "      # future has already been discarded" << endl << indent()
-               << "      continue" << endl << indent()
-               << "    method = getattr(self, 'recv_' + fname)" << endl << indent()
-               << "    try:" << endl << indent() << "      result = method(iprot, mtype, rseqid)"
-               << endl << indent() << "    except Exception as e:" << endl << indent()
-               << "      future.set_exception(e)" << endl << indent() << "    else:" << endl
-               << indent() << "      future.set_result(result)" << endl << endl;
+    f_service_ << endl <<
+      indent() << "@gen.engine" << endl <<
+      indent() << "def _start_receiving(self):" << endl <<
+      indent() << "  while True:" << endl <<
+      indent() << "    try:" << endl <<
+      indent() << "      frame = yield self._transport.readFrame()" << endl <<
+      indent() << "    except TTransport.TTransportException as e:" << endl <<
+      indent() << "      for future in self._reqs.values():" << endl <<
+      indent() << "        future.set_exception(e)" << endl <<
+      indent() << "      self._reqs = {}" << endl <<
+      indent() << "      return" << endl <<
+      indent() << "    tr = TTransport.TMemoryBuffer(frame)" << endl <<
+      indent() << "    iprot = self._iprot_factory.getProtocol(tr)" << endl <<
+      indent() << "    (fname, mtype, rseqid) = iprot.readMessageBegin()" << endl <<
+      indent() << "    method = getattr(self, 'recv_' + fname)" << endl <<
+      indent() << "    future = self._reqs.pop(rseqid, None)" << endl <<
+      indent() << "    if not future:" << endl <<
+      indent() << "      # future has already been discarded" << endl <<
+      indent() << "      continue" << endl <<
+      indent() << "    try:" << endl <<
+      indent() << "      result = method(iprot, mtype, rseqid)" << endl <<
+      indent() << "    except Exception as e:" << endl <<
+      indent() << "      future.set_exception(e)" << endl <<
+      indent() << "    else:" << endl <<
+      indent() << "      future.set_result(result)" << endl;
   }
 
   // Generate client method implementations
@@ -1155,6 +1283,7 @@ void t_py_generator::generate_service_client(t_service* tservice) {
     vector<t_field*>::const_iterator fld_iter;
     string funname = (*f_iter)->get_name();
 
+    f_service_ << endl;
     // Open function
     indent(f_service_) << "def " << function_signature(*f_iter, false) << ":" << endl;
     indent_up();
@@ -1364,12 +1493,10 @@ void t_py_generator::generate_service_client(t_service* tservice) {
 
       // Close function
       indent_down();
-      f_service_ << endl;
     }
   }
 
   indent_down();
-  f_service_ << endl;
 }
 
 /**
@@ -1392,30 +1519,42 @@ void t_py_generator::generate_service_remote(t_service* tservice) {
   ofstream f_remote;
   f_remote.open(f_remote_name.c_str());
 
-  f_remote << "#!/usr/bin/env python" << endl << py_autogen_comment() << endl << "import sys"
-           << endl << "import pprint" << endl << "from urlparse import urlparse" << endl
-           << "from thrift.transport import TTransport" << endl
-           << "from thrift.transport import TSocket" << endl
-           << "from thrift.transport import TSSLSocket" << endl
-           << "from thrift.transport import THttpClient" << endl
-           << "from thrift.protocol import TBinaryProtocol" << endl << endl;
+  f_remote <<
+    "#!/usr/bin/env python" << endl <<
+    py_autogen_comment() << endl <<
+    "import sys" << endl <<
+    "import pprint" << endl <<
+    "if sys.version_info[0] > 2:" << endl <<
+    "  from urllib.parse import urlparse" << endl <<
+    "else:" << endl <<
+    "  from urlparse import urlparse" << endl <<
+    "from thrift.transport import TTransport" << endl <<
+    "from thrift.transport import TSocket" << endl <<
+    "from thrift.transport import TSSLSocket" << endl <<
+    "from thrift.transport import THttpClient" << endl <<
+    "from thrift.protocol import TBinaryProtocol" << endl <<
+    endl;
 
-  f_remote << "from " << module_ << " import " << service_name_ << endl << "from " << module_
-           << ".ttypes import *" << endl << endl;
+  f_remote <<
+    "from " << module_ << " import " << service_name_ << endl <<
+    "from " << module_ << ".ttypes import *" << endl <<
+    endl;
 
-  f_remote << "if len(sys.argv) <= 1 or sys.argv[1] == '--help':" << endl << "  print('')" << endl
-           << "  print('Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] [-s[sl]] "
-              "function [arg1 [arg2...]]')" << endl << "  print('')" << endl
-           << "  print('Functions:')" << endl;
+  f_remote <<
+    "if len(sys.argv) <= 1 or sys.argv[1] == '--help':" << endl <<
+    "  print('')" << endl <<
+    "  print('Usage: ' + sys.argv[0] + ' [-h host[:port]] [-u url] [-f[ramed]] [-s[sl]] function [arg1 [arg2...]]')" << endl <<
+    "  print('')" << endl <<
+    "  print('Functions:')" << endl;
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
     f_remote << "  print('  " << (*f_iter)->get_returntype()->get_name() << " "
              << (*f_iter)->get_name() << "(";
     t_struct* arg_struct = (*f_iter)->get_arglist();
     const std::vector<t_field*>& args = arg_struct->get_members();
     vector<t_field*>::const_iterator a_iter;
-    int num_args = args.size();
+    std::vector<t_field*>::size_type num_args = args.size();
     bool first = true;
-    for (int i = 0; i < num_args; ++i) {
+    for (std::vector<t_field*>::size_type i = 0; i < num_args; ++i) {
       if (first) {
         first = false;
       } else {
@@ -1466,13 +1605,13 @@ void t_py_generator::generate_service_remote(t_service* tservice) {
     t_struct* arg_struct = (*f_iter)->get_arglist();
     const std::vector<t_field*>& args = arg_struct->get_members();
     vector<t_field*>::const_iterator a_iter;
-    int num_args = args.size();
+    std::vector<t_field*>::size_type num_args = args.size();
 
     f_remote << "if cmd == '" << (*f_iter)->get_name() << "':" << endl
              << "  if len(args) != " << num_args << ":" << endl << "    print('"
              << (*f_iter)->get_name() << " requires " << num_args << " args')" << endl
              << "    sys.exit(1)" << endl << "  pp.pprint(client." << (*f_iter)->get_name() << "(";
-    for (int i = 0; i < num_args; ++i) {
+    for (std::vector<t_field*>::size_type i = 0; i < num_args; ++i) {
       if (args[i]->get_type()->is_string()) {
         f_remote << "args[" << i << "],";
       } else {
@@ -1525,6 +1664,8 @@ void t_py_generator::generate_service_server(t_service* tservice) {
     extends = type_name(tservice->get_extends());
     extends_processor = extends + ".Processor, ";
   }
+
+  f_service_ << endl << endl;
 
   // Generate the header portion
   if (gen_twisted_) {
@@ -1596,15 +1737,14 @@ void t_py_generator::generate_service_server(t_service* tservice) {
   }
 
   indent_down();
-  f_service_ << endl;
 
   // Generate the process subfunctions
   for (f_iter = functions.begin(); f_iter != functions.end(); ++f_iter) {
+    f_service_ << endl;
     generate_process_function(tservice, *f_iter);
   }
 
   indent_down();
-  f_service_ << endl;
 }
 
 /**
@@ -1641,6 +1781,8 @@ void t_py_generator::generate_process_function(t_service* tservice, t_function* 
   }
 
   if (gen_twisted_) {
+    // TODO: Propagate arbitrary exception raised by handler to client as does plain "py"
+
     // Generate the function call
     t_struct* arg_struct = tfunction->get_arglist();
     const std::vector<t_field*>& fields = arg_struct->get_members();
@@ -1701,8 +1843,8 @@ void t_py_generator::generate_process_function(t_service* tservice, t_function* 
       // Kinda absurd
       f_service_ << indent() << "  error.raiseException()" << endl;
       for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
-        f_service_ << indent() << "except " << type_name((*x_iter)->get_type()) << ", "
-                   << (*x_iter)->get_name() << ":" << endl;
+        f_service_ <<
+          indent() << "except " << type_name((*x_iter)->get_type()) << " as " << (*x_iter)->get_name() << ":" << endl;
         if (!tfunction->is_oneway()) {
           indent_up();
           f_service_ << indent() << "result." << (*x_iter)->get_name() << " = "
@@ -1745,6 +1887,8 @@ void t_py_generator::generate_process_function(t_service* tservice, t_function* 
     }
     */
 
+    // TODO: Propagate arbitrary exception raised by handler to client as does plain "py"
+
     // Generate the function call
     t_struct* arg_struct = tfunction->get_arglist();
     const std::vector<t_field*>& fields = arg_struct->get_members();
@@ -1773,7 +1917,7 @@ void t_py_generator::generate_process_function(t_service* tservice, t_function* 
     if (!tfunction->is_oneway() && xceptions.size() > 0) {
       indent_down();
       for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
-        f_service_ << indent() << "except " << type_name((*x_iter)->get_type()) << ", "
+        f_service_ << indent() << "except " << type_name((*x_iter)->get_type()) << " as "
                    << (*x_iter)->get_name() << ":" << endl;
         if (!tfunction->is_oneway()) {
           indent_up();
@@ -1799,10 +1943,9 @@ void t_py_generator::generate_process_function(t_service* tservice, t_function* 
 
   } else { // py
     // Try block for a function with exceptions
-    if (xceptions.size() > 0) {
-      f_service_ << indent() << "try:" << endl;
-      indent_up();
-    }
+    // It also catches arbitrary exceptions raised by handler method to propagate them to the client
+    f_service_ << indent() << "try:" << endl;
+    indent_up();
 
     // Generate the function call
     t_struct* arg_struct = tfunction->get_arglist();
@@ -1824,14 +1967,22 @@ void t_py_generator::generate_process_function(t_service* tservice, t_function* 
       f_service_ << "args." << (*f_iter)->get_name();
     }
     f_service_ << ")" << endl;
+    if (!tfunction->is_oneway()) {
+      f_service_  << indent() << "msg_type = TMessageType.REPLY" << endl;
+    }
 
-    if (!tfunction->is_oneway() && xceptions.size() > 0) {
-      indent_down();
+    indent_down();
+    f_service_ << indent()
+               << "except (TTransport.TTransportException, KeyboardInterrupt, SystemExit):" << endl
+               << indent() << "  raise" << endl;
+
+    if (!tfunction->is_oneway()) {
       for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
-        f_service_ << indent() << "except " << type_name((*x_iter)->get_type()) << ", "
+        f_service_ << indent() << "except " << type_name((*x_iter)->get_type()) << " as "
                    << (*x_iter)->get_name() << ":" << endl;
         if (!tfunction->is_oneway()) {
           indent_up();
+          f_service_ << indent() << "msg_type = TMessageType.REPLY" << endl;
           f_service_ << indent() << "result." << (*x_iter)->get_name() << " = "
                      << (*x_iter)->get_name() << endl;
           indent_down();
@@ -1839,24 +1990,25 @@ void t_py_generator::generate_process_function(t_service* tservice, t_function* 
           f_service_ << indent() << "pass" << endl;
         }
       }
-    }
 
-    // Shortcut out here for oneway functions
-    if (tfunction->is_oneway()) {
-      f_service_ << indent() << "return" << endl;
-      indent_down();
-      f_service_ << endl;
-      return;
+      f_service_ << indent() << "except Exception as ex:" << endl
+                 << indent() << "  msg_type = TMessageType.EXCEPTION" << endl
+                 << indent() << "  logging.exception(ex)" << endl
+                 << indent()
+                 << "  result = TApplicationException(TApplicationException.INTERNAL_ERROR, "
+                    "'Internal error')" << endl
+                 << indent() << "oprot.writeMessageBegin(\"" << tfunction->get_name()
+                 << "\", msg_type, seqid)" << endl
+                 << indent() << "result.write(oprot)" << endl
+                 << indent() << "oprot.writeMessageEnd()" << endl
+                 << indent() << "oprot.trans.flush()" << endl;
+    } else {
+      f_service_ << indent() << "except:" << endl
+                 << indent() << "  pass" << endl;
     }
-
-    f_service_ << indent() << "oprot.writeMessageBegin(\"" << tfunction->get_name()
-               << "\", TMessageType.REPLY, seqid)" << endl << indent() << "result.write(oprot)"
-               << endl << indent() << "oprot.writeMessageEnd()" << endl << indent()
-               << "oprot.trans.flush()" << endl;
 
     // Close function
     indent_down();
-    f_service_ << endl;
   }
 }
 
@@ -1865,9 +2017,7 @@ void t_py_generator::generate_process_function(t_service* tservice, t_function* 
  */
 void t_py_generator::generate_deserialize_field(ofstream& out,
                                                 t_field* tfield,
-                                                string prefix,
-                                                bool inclass) {
-  (void)inclass;
+                                                string prefix) {
   t_type* type = get_true_type(tfield->get_type());
 
   if (type->is_void()) {
@@ -1888,18 +2038,19 @@ void t_py_generator::generate_deserialize_field(ofstream& out,
       switch (tbase) {
       case t_base_type::TYPE_VOID:
         throw "compiler error: cannot serialize void field in a struct: " + name;
-        break;
       case t_base_type::TYPE_STRING:
-        if (((t_base_type*)type)->is_binary() || !gen_utf8strings_) {
+        if (((t_base_type*)type)->is_binary()) {
+          out << "readBinary()";
+        } else if(!gen_utf8strings_) {
           out << "readString()";
         } else {
-          out << "readString().decode('utf-8')";
+          out << "readString().decode('utf-8') if sys.version_info[0] == 2 else iprot.readString()";
         }
         break;
       case t_base_type::TYPE_BOOL:
         out << "readBool()";
         break;
-      case t_base_type::TYPE_BYTE:
+      case t_base_type::TYPE_I8:
         out << "readByte()";
         break;
       case t_base_type::TYPE_I16:
@@ -1933,8 +2084,12 @@ void t_py_generator::generate_deserialize_field(ofstream& out,
  * Generates an unserializer for a struct, calling read()
  */
 void t_py_generator::generate_deserialize_struct(ofstream& out, t_struct* tstruct, string prefix) {
-  out << indent() << prefix << " = " << type_name(tstruct) << "()" << endl << indent() << prefix
-      << ".read(iprot)" << endl;
+  if (is_immutable(tstruct)) {
+    out << indent() << prefix << " = " << type_name(tstruct) << ".read(iprot)" << endl;
+  } else {
+    out << indent() << prefix << " = " << type_name(tstruct) << "()" << endl
+        << indent() << prefix << ".read(iprot)" << endl;
+  }
 }
 
 /**
@@ -1948,14 +2103,14 @@ void t_py_generator::generate_deserialize_container(ofstream& out, t_type* ttype
   string etype = tmp("_etype");
 
   t_field fsize(g_type_i32, size);
-  t_field fktype(g_type_byte, ktype);
-  t_field fvtype(g_type_byte, vtype);
-  t_field fetype(g_type_byte, etype);
+  t_field fktype(g_type_i8, ktype);
+  t_field fvtype(g_type_i8, vtype);
+  t_field fetype(g_type_i8, etype);
 
   // Declare variables, read header
   if (ttype->is_map()) {
     out << indent() << prefix << " = {}" << endl << indent() << "(" << ktype << ", " << vtype
-        << ", " << size << " ) = iprot.readMapBegin()" << endl;
+        << ", " << size << ") = iprot.readMapBegin()" << endl;
   } else if (ttype->is_set()) {
     out << indent() << prefix << " = set()" << endl << indent() << "(" << etype << ", " << size
         << ") = iprot.readSetBegin()" << endl;
@@ -1966,7 +2121,8 @@ void t_py_generator::generate_deserialize_container(ofstream& out, t_type* ttype
 
   // For loop iterates over elements
   string i = tmp("_i");
-  indent(out) << "for " << i << " in xrange(" << size << "):" << endl;
+  indent(out) <<
+    "for " << i << " in range(" << size << "):" << endl;
 
   indent_up();
 
@@ -1983,9 +2139,18 @@ void t_py_generator::generate_deserialize_container(ofstream& out, t_type* ttype
   // Read container end
   if (ttype->is_map()) {
     indent(out) << "iprot.readMapEnd()" << endl;
+    if (is_immutable(ttype)) {
+      indent(out) << prefix << " = TFrozenDict(" << prefix << ")" << endl;
+    }
   } else if (ttype->is_set()) {
     indent(out) << "iprot.readSetEnd()" << endl;
+    if (is_immutable(ttype)) {
+      indent(out) << prefix << " = frozenset(" << prefix << ")" << endl;
+    }
   } else if (ttype->is_list()) {
+    if (is_immutable(ttype)) {
+      indent(out) << prefix << " = tuple(" << prefix << ")" << endl;
+    }
     indent(out) << "iprot.readListEnd()" << endl;
   }
 }
@@ -2062,16 +2227,18 @@ void t_py_generator::generate_serialize_field(ofstream& out, t_field* tfield, st
         throw "compiler error: cannot serialize void field in a struct: " + name;
         break;
       case t_base_type::TYPE_STRING:
-        if (((t_base_type*)type)->is_binary() || !gen_utf8strings_) {
+        if (((t_base_type*)type)->is_binary()) {
+          out << "writeBinary(" << name << ")";
+        } else if (!gen_utf8strings_) {
           out << "writeString(" << name << ")";
         } else {
-          out << "writeString(" << name << ".encode('utf-8'))";
+          out << "writeString(" << name << ".encode('utf-8') if sys.version_info[0] == 2 else " << name << ")";
         }
         break;
       case t_base_type::TYPE_BOOL:
         out << "writeBool(" << name << ")";
         break;
-      case t_base_type::TYPE_BYTE:
+      case t_base_type::TYPE_I8:
         out << "writeByte(" << name << ")";
         break;
       case t_base_type::TYPE_I16:
@@ -2129,7 +2296,7 @@ void t_py_generator::generate_serialize_container(ofstream& out, t_type* ttype, 
   if (ttype->is_map()) {
     string kiter = tmp("kiter");
     string viter = tmp("viter");
-    indent(out) << "for " << kiter << "," << viter << " in " << prefix << ".items():" << endl;
+    indent(out) << "for " << kiter << ", " << viter << " in " << prefix << ".items():" << endl;
     indent_up();
     generate_serialize_map_element(out, (t_map*)ttype, kiter, viter);
     indent_down();
@@ -2339,12 +2506,16 @@ string t_py_generator::argument_list(t_struct* tstruct, vector<string>* pre, vec
 }
 
 string t_py_generator::type_name(t_type* ttype) {
+  while (ttype->is_typedef()) {
+    ttype = ((t_typedef*)ttype)->get_type();
+  }
+
   t_program* program = ttype->get_program();
   if (ttype->is_service()) {
-    return get_real_py_module(program, gen_twisted_) + "." + ttype->get_name();
+    return get_real_py_module(program, gen_twisted_, package_prefix_) + "." + ttype->get_name();
   }
   if (program != NULL && program != program_) {
-    return get_real_py_module(program, gen_twisted_) + ".ttypes." + ttype->get_name();
+    return get_real_py_module(program, gen_twisted_, package_prefix_) + ".ttypes." + ttype->get_name();
   }
   return ttype->get_name();
 }
@@ -2364,7 +2535,7 @@ string t_py_generator::type_to_enum(t_type* type) {
       return "TType.STRING";
     case t_base_type::TYPE_BOOL:
       return "TType.BOOL";
-    case t_base_type::TYPE_BYTE:
+    case t_base_type::TYPE_I8:
       return "TType.BYTE";
     case t_base_type::TYPE_I16:
       return "TType.I16";
@@ -2396,23 +2567,31 @@ string t_py_generator::type_to_spec_args(t_type* ttype) {
     ttype = ((t_typedef*)ttype)->get_type();
   }
 
-  if (ttype->is_base_type() || ttype->is_enum()) {
-    return "None";
+  if (ttype->is_base_type() && reinterpret_cast<t_base_type*>(ttype)->is_binary()) {
+    return  "'BINARY'";
+  } else if (gen_utf8strings_ && ttype->is_base_type()
+             && reinterpret_cast<t_base_type*>(ttype)->is_string()) {
+    return "'UTF8'";
+  } else if (ttype->is_base_type() || ttype->is_enum()) {
+    return  "None";
   } else if (ttype->is_struct() || ttype->is_xception()) {
     return "(" + type_name(ttype) + ", " + type_name(ttype) + ".thrift_spec)";
   } else if (ttype->is_map()) {
-    return "(" + type_to_enum(((t_map*)ttype)->get_key_type()) + ","
-           + type_to_spec_args(((t_map*)ttype)->get_key_type()) + ","
-           + type_to_enum(((t_map*)ttype)->get_val_type()) + ","
-           + type_to_spec_args(((t_map*)ttype)->get_val_type()) + ")";
+    return "(" + type_to_enum(((t_map*)ttype)->get_key_type()) + ", "
+           + type_to_spec_args(((t_map*)ttype)->get_key_type()) + ", "
+           + type_to_enum(((t_map*)ttype)->get_val_type()) + ", "
+           + type_to_spec_args(((t_map*)ttype)->get_val_type()) + ", "
+           + (is_immutable(ttype) ? "True" : "False") + ")";
 
   } else if (ttype->is_set()) {
-    return "(" + type_to_enum(((t_set*)ttype)->get_elem_type()) + ","
-           + type_to_spec_args(((t_set*)ttype)->get_elem_type()) + ")";
+    return "(" + type_to_enum(((t_set*)ttype)->get_elem_type()) + ", "
+           + type_to_spec_args(((t_set*)ttype)->get_elem_type()) + ", "
+           + (is_immutable(ttype) ? "True" : "False") + ")";
 
   } else if (ttype->is_list()) {
-    return "(" + type_to_enum(((t_list*)ttype)->get_elem_type()) + ","
-           + type_to_spec_args(((t_list*)ttype)->get_elem_type()) + ")";
+    return "(" + type_to_enum(((t_list*)ttype)->get_elem_type()) + ", "
+           + type_to_spec_args(((t_list*)ttype)->get_elem_type()) + ", "
+           + (is_immutable(ttype) ? "True" : "False") + ")";
   }
 
   throw "INVALID TYPE IN type_to_spec_args: " + ttype->get_name();
@@ -2421,13 +2600,17 @@ string t_py_generator::type_to_spec_args(t_type* ttype) {
 THRIFT_REGISTER_GENERATOR(
     py,
     "Python",
-    "    new_style:       Generate new-style classes.\n"
     "    twisted:         Generate Twisted-friendly RPC services.\n"
     "    tornado:         Generate code for use with Tornado.\n"
-    "    utf8strings:     Encode/decode strings using utf8 in the generated code.\n"
+    "    no_utf8strings:  Do not Encode/decode strings using utf8 in the generated code. Basically no effect for Python 3.\n"
+    "    coding=CODING:   Add file encoding declare in generated file.\n"
     "    slots:           Generate code using slots for instance members.\n"
     "    dynamic:         Generate dynamic code, less code generated but slower.\n"
     "    dynbase=CLS      Derive generated classes from class CLS instead of TBase.\n"
+    "    dynfrozen=CLS    Derive generated immutable classes from class CLS instead of TFrozenBase.\n"
     "    dynexc=CLS       Derive generated exceptions from CLS instead of TExceptionBase.\n"
     "    dynimport='from foo.bar import CLS'\n"
-    "                     Add an import line to generated code to find the dynbase class.\n")
+    "                     Add an import line to generated code to find the dynbase class.\n"
+    "    package_prefix='top.package.'\n"
+    "                     Package prefix for generated files.\n"
+    "    old_style:       Deprecated. Generate old-style classes.\n")

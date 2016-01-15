@@ -99,9 +99,9 @@ BOOST_AUTO_TEST_CASE(getCppNamespace_returns_proper_namespace) {
 BOOST_AUTO_TEST_CASE(getTTypeString_support_base_types) {
   BOOST_CHECK_EQUAL(getTTypeString(t_base_type::type_void), "::apache::thrift::protocol::T_VOID");
   BOOST_CHECK_EQUAL(getTTypeString(t_base_type::type_bool), "::apache::thrift::protocol::T_BOOL");
-  BOOST_CHECK_EQUAL(getTTypeString(t_base_type::type_byte), "::apache::thrift::protocol::T_BYTE");
   BOOST_CHECK_EQUAL(getTTypeString(t_base_type::type_double),
                     "::apache::thrift::protocol::T_DOUBLE");
+  BOOST_CHECK_EQUAL(getTTypeString(t_base_type::type_i8),  "::apache::thrift::protocol::T_I8");
   BOOST_CHECK_EQUAL(getTTypeString(t_base_type::type_i16), "::apache::thrift::protocol::T_I16");
   BOOST_CHECK_EQUAL(getTTypeString(t_base_type::type_i32), "::apache::thrift::protocol::T_I32");
   BOOST_CHECK_EQUAL(getTTypeString(t_base_type::type_i64), "::apache::thrift::protocol::T_I64");

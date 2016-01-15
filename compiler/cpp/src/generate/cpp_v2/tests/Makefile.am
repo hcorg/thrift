@@ -80,10 +80,11 @@ CompilerCppV2GeneratorUnitTests_SOURCES = \
 
 CompilerCppV2GeneratorUnitTests_LDADD = \
 	$(BOOST_TEST_LDADD) \
-	$(top_builddir)/compiler/cpp/src/libparseobjects.a \
 	$(top_builddir)/compiler/cpp/src/libcompilermd5.a \
+	$(top_builddir)/compiler/cpp/src/libcompileraudit.a \
 	$(top_builddir)/compiler/cpp/src/generate/libgenerate.a \
-	$(top_builddir)/compiler/cpp/src/generate/cpp_v2/libgenerate_cpp_v2.a
+	$(top_builddir)/compiler/cpp/src/generate/cpp_v2/libgenerate_cpp_v2.a \
+	$(top_builddir)/compiler/cpp/src/libparseobjects.a
 
 AM_CXXFLAGS = -Wall -Wextra -Wpedantic -Werror
 AM_CPPFLAGS = $(BOOST_CPPFLAGS) \

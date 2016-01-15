@@ -15,104 +15,125 @@
 # Known missing client libraries:
 #  - D
 #  - Haxe
+#  - Lua
 #
 
-FROM centos:6.6
+FROM centos:7
 MAINTAINER Apache Thrift <dev@thrift.apache.org>
 
-ENV HOME /root
-
-RUN yum -y update
+RUN yum install -y epel-release
 
 # General dependencies
-RUN yum -y install -y tar m4 perl gcc git libtool libevent-devel zlib-devel openssl-devel
+RUN yum install -y \
+      tar \
+      m4 \
+      perl \
+      clang \
+      gcc \
+      gcc-c++ \
+      git \
+      libtool \
+      autoconf \
+      make \
+      bison \
+      bison-devel \
+      flex
 
-RUN mkdir -p /tmp/epel && \
-    curl -SL "http://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm" -o /tmp/epel/epel-release-6-8.noarch.rpm && \
-    cd /tmp/epel && \
-    rpm -ivh epel-release-6-8.noarch.rpm && \
-    cd $HOME
-
-# Autoconf
-RUN mkdir -p /tmp/autoconf && \
-    curl -SL "http://ftp.gnu.org/gnu/autoconf/autoconf-2.69.tar.gz" | tar -xzC /tmp/autoconf && \
-    cd /tmp/autoconf/autoconf-2.69 && \
-    ./configure --prefix=/usr && \
-    make && \
-    make install && \
-    cd $HOME
-
-# Automake
-RUN mkdir -p /tmp/automake && \
-    curl -SL "http://ftp.gnu.org/gnu/automake/automake-1.14.tar.gz" | tar -xzC /tmp/automake && \
-    cd /tmp/automake/automake-1.14 && \
-    ./configure --prefix=/usr && \
-    make && \
-    make install && \
-    cd $HOME
-
-# Bison
-RUN mkdir -p /tmp/bison && \
-    curl -SL "http://ftp.gnu.org/gnu/bison/bison-2.5.1.tar.gz" | tar -xzC /tmp/bison && \
-    cd /tmp/bison/bison-2.5.1 && \
-    ./configure --prefix=/usr && \
-    make && \
-    make install && \
-    cd $HOME
-
-# Install an updated Boost library
-RUN mkdir -p /tmp/boost && \
-    curl -SL "http://sourceforge.net/projects/boost/files/boost/1.55.0/boost_1_55_0.tar.gz" | tar -xzC /tmp/boost && \
-    cd /tmp/boost/boost_1_55_0 && \
-    ./bootstrap.sh  && \
-    ./b2 install && \
-    cd $HOME
+# C++ dependencies
+RUN yum install -y \
+      boost-devel-static \
+      zlib-devel \
+      openssl-devel \
+      libevent-devel
 
 # Java Dependencies
-RUN yum install -y ant junit ant-nodeps ant-junit java-1.7.0-openjdk-devel
+RUN yum install -y \
+      ant \
+      junit \
+      ant-junit \
+      java-1.7.0-openjdk-devel
 
 # Python Dependencies
-RUN yum install -y python-devel python-setuptools python-twisted
+RUN yum install -y \
+      python-devel \
+      python-setuptools \
+      python-twisted-web \
+      python-six
 
 # Ruby Dependencies
-RUN yum install -y ruby ruby-devel rubygems && \
+RUN yum install -y \
+      ruby \
+      ruby-devel \
+      rubygems && \
     gem install bundler rake
 
-# Node.js Dependencies
-RUN yum install -y nodejs nodejs-devel npm
-
 # Perl Dependencies
-RUN yum install -y perl-Bit-Vector perl-Class-Accessor perl-ExtUtils-MakeMaker perl-Test-Simple
+RUN yum install -y \
+      perl-Bit-Vector \
+      perl-Class-Accessor \
+      perl-ExtUtils-MakeMaker \
+      perl-Test-Simple \
+      perl-IO-Socket-SSL \
+      perl-Net-SSLeay \
+      perl-Crypt-SSLeay
 
 # PHP Dependencies
-RUN yum install -y php php-devel php-pear re2c
+RUN yum install -y \
+      php \
+      php-devel \
+      php-pear \
+      re2c \
+      php-phpunit-PHPUnit \
+      bzip2
 
 # GLibC Dependencies
 RUN yum install -y glib2-devel
 
 # Erlang Dependencies
-RUN yum install -y erlang-kernel erlang-erts erlang-stdlib erlang-eunit erlang-rebar
-
-# Lua Dependencies
-RUN yum install -y lua-devel
+RUN curl -sSL http://packages.erlang-solutions.com/rpm/centos/erlang_solutions.repo -o /etc/yum.repos.d/erlang_solutions.repo && \
+    yum install -y \
+      erlang-kernel \
+      erlang-erts \
+      erlang-stdlib \
+      erlang-eunit \
+      erlang-rebar \
+      erlang-tools
 
 # Go Dependencies
-RUN yum install -y golang golang-pkg-linux-amd64
-
-# C# Dependencies
-RUN yum install -y mono-core mono-devel mono-web-devel mono-extras mingw32-binutils mingw32-runtime mingw32-nsis
+RUN curl -sSL https://storage.googleapis.com/golang/go1.4.3.linux-amd64.tar.gz | tar -C /usr/local/ -xz
+ENV PATH /usr/local/go/bin:$PATH
 
 # Haskell Dependencies
-RUN mkdir -p /tmp/haskell &&\
-    curl -SL "http://sherkin.justhub.org/el6/RPMS/x86_64/justhub-release-2.0-4.0.el6.x86_64.rpm" -o /tmp/haskell/justhub-release-2.0-4.0.el6.x86_64.rpm && \
-    cd /tmp/haskell && \
-    rpm -ivh justhub-release-2.0-4.0.el6.x86_64.rpm && \
-    yum -y install haskell && \
-    cabal update && \
-    cabal install cabal-install && \
-    cd $HOME
+RUN yum -y install haskell-platform
+
+# Node.js Dependencies
+RUN yum install -y \
+      nodejs \
+      nodejs-devel \
+      npm
+
+# C# Dependencies
+RUN yum install -y \
+      mono-core \
+      mono-devel \
+      mono-web-devel \
+      mono-extras \
+
+# MinGW Dependencies
+RUN yum install -y \
+      mingw32-binutils \
+      mingw32-crt \
+      mingw32-nsis
+
+# CMake
+RUN curl -sSL https://cmake.org/files/v3.4/cmake-3.4.0.tar.gz | tar -xz && \
+    cd cmake-3.4.0 && ./bootstrap && make -j4 && make install
 
 # Clean up
-RUN rm -rf /tmp/*
+RUN rm -rf /tmp/* && \
+    yum clean all
 
-WORKDIR $HOME
+ENV THRIFT_ROOT /thrift
+RUN mkdir -p $THRIFT_ROOT/src
+COPY scripts $THRIFT_ROOT
+WORKDIR $THRIFT_ROOT/src

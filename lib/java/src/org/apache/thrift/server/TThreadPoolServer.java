@@ -70,6 +70,11 @@ public class TThreadPoolServer extends TServer {
       return this;
     }
 
+    public Args stopTimeoutVal(int n) {
+      stopTimeoutVal = n;
+      return this;
+    }
+
     public Args requestTimeout(int n) {
       requestTimeout = n;
       return this;
@@ -99,10 +104,6 @@ public class TThreadPoolServer extends TServer {
 
   // Executor service for handling client connections
   private ExecutorService executorService_;
-
-  // Flag for stopping the server
-  // Please see THRIFT-1795 for the usage of this flag
-  private volatile boolean stopped_ = false;
 
   private final TimeUnit stopTimeoutUnit;
 
@@ -134,7 +135,7 @@ public class TThreadPoolServer extends TServer {
       new SynchronousQueue<Runnable>();
     return new ThreadPoolExecutor(args.minWorkerThreads,
                                   args.maxWorkerThreads,
-                                  60,
+                                  args.stopTimeoutVal,
                                   TimeUnit.SECONDS,
                                   executorQueue);
   }
@@ -294,18 +295,19 @@ public class TThreadPoolServer extends TServer {
         LOGGER.error("Thrift error occurred during processing of message.", tx);
       } catch (Exception x) {
         LOGGER.error("Error occurred during processing of message.", x);
-      }
-
-      if (eventHandler != null) {
-        eventHandler.deleteContext(connectionContext, inputProtocol, outputProtocol);
-      }
-
-      if (inputTransport != null) {
-        inputTransport.close();
-      }
-
-      if (outputTransport != null) {
-        outputTransport.close();
+      } finally {
+        if (eventHandler != null) {
+          eventHandler.deleteContext(connectionContext, inputProtocol, outputProtocol);
+        }
+        if (inputTransport != null) {
+          inputTransport.close();
+        }
+        if (outputTransport != null) {
+          outputTransport.close();
+        }
+        if (client_.isOpen()) {
+          client_.close();
+        }
       }
     }
   }

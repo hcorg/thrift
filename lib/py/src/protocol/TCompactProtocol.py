@@ -17,8 +17,10 @@
 # under the License.
 #
 
-from TProtocol import *
+from .TProtocol import TType, TProtocolBase, TProtocolException, checkIntegerLimits
 from struct import pack, unpack
+
+from ..compat import binary_to_str, str_to_binary
 
 __all__ = ['TCompactProtocol', 'TCompactProtocolFactory']
 
@@ -54,7 +56,7 @@ def fromZigZag(n):
 
 
 def writeVarint(trans, n):
-  out = []
+  out = bytearray()
   while True:
     if n & ~0x7f == 0:
       out.append(n)
@@ -62,7 +64,7 @@ def writeVarint(trans, n):
     else:
       out.append((n & 0xff) | 0x80)
       n = n >> 7
-  trans.write(''.join(map(chr, out)))
+  trans.write(bytes(out))
 
 
 def readVarint(trans):
@@ -77,7 +79,7 @@ def readVarint(trans):
     shift += 7
 
 
-class CompactType:
+class CompactType(object):
   STOP = 0x00
   TRUE = 0x01
   FALSE = 0x02
@@ -124,7 +126,9 @@ class TCompactProtocol(TProtocolBase):
   TYPE_BITS = 0x07
   TYPE_SHIFT_AMOUNT = 5
 
-  def __init__(self, trans):
+  def __init__(self, trans,
+               string_length_limit=None,
+               container_length_limit=None):
     TProtocolBase.__init__(self, trans)
     self.state = CLEAR
     self.__last_fid = 0
@@ -132,6 +136,14 @@ class TCompactProtocol(TProtocolBase):
     self.__bool_value = None
     self.__structs = []
     self.__containers = []
+    self.string_length_limit = string_length_limit
+    self.container_length_limit = container_length_limit
+
+  def _check_string_length(self, length):
+    self._check_length(self.string_length_limit, length)
+
+  def _check_container_length(self, length):
+    self._check_length(self.container_length_limit, length)
 
   def __writeVarint(self, n):
     writeVarint(self.trans, n)
@@ -141,7 +153,7 @@ class TCompactProtocol(TProtocolBase):
     self.__writeUByte(self.PROTOCOL_ID)
     self.__writeUByte(self.VERSION | (type << self.TYPE_SHIFT_AMOUNT))
     self.__writeVarint(seqid)
-    self.__writeString(name)
+    self.__writeBinary(str_to_binary(name))
     self.state = VALUE_WRITE
 
   def writeMessageEnd(self):
@@ -254,10 +266,10 @@ class TCompactProtocol(TProtocolBase):
   def writeDouble(self, dub):
     self.trans.write(pack('<d', dub))
 
-  def __writeString(self, s):
+  def __writeBinary(self, s):
     self.__writeSize(len(s))
     self.trans.write(s)
-  writeString = writer(__writeString)
+  writeBinary = writer(__writeBinary)
 
   def readFieldBegin(self):
     assert self.state == FIELD_READ, self.state
@@ -302,7 +314,7 @@ class TCompactProtocol(TProtocolBase):
   def __readSize(self):
     result = self.__readVarint()
     if result < 0:
-      raise TException("Length < 0")
+      raise TProtocolException("Length < 0")
     return result
 
   def readMessageBegin(self):
@@ -310,15 +322,15 @@ class TCompactProtocol(TProtocolBase):
     proto_id = self.__readUByte()
     if proto_id != self.PROTOCOL_ID:
       raise TProtocolException(TProtocolException.BAD_VERSION,
-          'Bad protocol id in the message: %d' % proto_id)
+                               'Bad protocol id in the message: %d' % proto_id)
     ver_type = self.__readUByte()
     type = (ver_type >> self.TYPE_SHIFT_AMOUNT) & self.TYPE_BITS
     version = ver_type & self.VERSION_MASK
     if version != self.VERSION:
       raise TProtocolException(TProtocolException.BAD_VERSION,
-          'Bad version: %d (expect %d)' % (version, self.VERSION))
+                               'Bad version: %d (expect %d)' % (version, self.VERSION))
     seqid = self.__readVarint()
-    name = self.__readString()
+    name = binary_to_str(self.__readBinary())
     return (name, type, seqid)
 
   def readMessageEnd(self):
@@ -342,6 +354,7 @@ class TCompactProtocol(TProtocolBase):
     type = self.__getTType(size_type)
     if size == 15:
       size = self.__readSize()
+    self._check_container_length(size)
     self.__containers.append(self.state)
     self.state = CONTAINER_READ
     return type, size
@@ -351,6 +364,7 @@ class TCompactProtocol(TProtocolBase):
   def readMapBegin(self):
     assert self.state in (VALUE_READ, CONTAINER_READ), self.state
     size = self.__readSize()
+    self._check_container_length(size)
     types = 0
     if size > 0:
       types = self.__readUByte()
@@ -388,18 +402,24 @@ class TCompactProtocol(TProtocolBase):
     val, = unpack('<d', buff)
     return val
 
-  def __readString(self):
-    len = self.__readSize()
-    return self.trans.readAll(len)
-  readString = reader(__readString)
+  def __readBinary(self):
+    size = self.__readSize()
+    self._check_string_length(size)
+    return self.trans.readAll(size)
+  readBinary = reader(__readBinary)
 
   def __getTType(self, byte):
     return TTYPES[byte & 0x0f]
 
 
-class TCompactProtocolFactory:
-  def __init__(self):
-    pass
+class TCompactProtocolFactory(object):
+  def __init__(self,
+               string_length_limit=None,
+               container_length_limit=None):
+    self.string_length_limit = string_length_limit
+    self.container_length_limit = container_length_limit
 
   def getProtocol(self, trans):
-    return TCompactProtocol(trans)
+    return TCompactProtocol(trans,
+                            self.string_length_limit,
+                            self.container_length_limit)

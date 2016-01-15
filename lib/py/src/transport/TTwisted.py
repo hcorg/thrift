@@ -17,8 +17,8 @@
 # under the License.
 #
 
+from io import BytesIO
 import struct
-from cStringIO import StringIO
 
 from zope.interface import implements, Interface, Attribute
 from twisted.internet.protocol import ServerFactory, ClientFactory, \
@@ -34,14 +34,14 @@ from thrift.transport import TTransport
 class TMessageSenderTransport(TTransport.TTransportBase):
 
     def __init__(self):
-        self.__wbuf = StringIO()
+        self.__wbuf = BytesIO()
 
     def write(self, buf):
         self.__wbuf.write(buf)
 
     def flush(self):
         msg = self.__wbuf.getvalue()
-        self.__wbuf = StringIO()
+        self.__wbuf = BytesIO()
         return self.sendMessage(msg)
 
     def sendMessage(self, message):
@@ -82,11 +82,18 @@ class ThriftClientProtocol(basic.Int32StringReceiver):
         self.started.callback(self.client)
 
     def connectionLost(self, reason=connectionDone):
-        for k, v in self.client._reqs.iteritems():
+        # the called errbacks can add items to our client's _reqs,
+        # so we need to use a tmp, and iterate until no more requests
+        # are added during errbacks
+        if self.client:
             tex = TTransport.TTransportException(
                 type=TTransport.TTransportException.END_OF_FILE,
-                message='Connection closed')
-            v.errback(tex)
+                message='Connection closed (%s)' % reason)
+            while self.client._reqs:
+                _, v = self.client._reqs.popitem()
+                v.errback(tex)
+            del self.client._reqs
+            self.client = None
 
     def stringReceived(self, frame):
         tr = TTransport.TMemoryBuffer(frame)

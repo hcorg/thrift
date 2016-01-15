@@ -505,7 +505,7 @@ namespace Thrift.Protocol
         private void WriteJSONDouble(double num)
         {
             context.Write();
-            String str = num.ToString(CultureInfo.InvariantCulture);
+            String str = num.ToString("G17", CultureInfo.InvariantCulture);
             bool special = false;
 
             switch (str[0])
@@ -544,6 +544,11 @@ namespace Thrift.Protocol
             int len = b.Length;
             int off = 0;
 
+            // Ignore padding
+            int bound = len >= 2 ? len - 2 : 0;
+            for (int i = len - 1; i >= bound && b[i] == '='; --i) {
+                --len;
+            }
             while (len >= 3)
             {
                 // Encode 3 bytes at a time
@@ -720,6 +725,7 @@ namespace Thrift.Protocol
         private byte[] ReadJSONString(bool skipContext)
         {
             MemoryStream buffer = new MemoryStream();
+            List<char> codeunits = new List<char>();
 
 
             if (!skipContext)
@@ -764,9 +770,41 @@ namespace Thrift.Protocol
                                   (HexVal((byte)tempBuffer[1]) << 8) +
                                   (HexVal((byte)tempBuffer[2]) << 4) +
                                    HexVal(tempBuffer[3]));
-                var tmp = utf8Encoding.GetBytes(new char[] { (char)wch });
-                buffer.Write(tmp, 0, tmp.Length);
+                if (Char.IsHighSurrogate((char)wch))
+                {
+                    if (codeunits.Count > 0)
+                    {
+                        throw new TProtocolException(TProtocolException.INVALID_DATA,
+                                                        "Expected low surrogate char");
+                    }
+                    codeunits.Add((char)wch);
+                }
+                else if (Char.IsLowSurrogate((char)wch))
+                {
+                    if (codeunits.Count == 0)
+                    {
+                        throw new TProtocolException(TProtocolException.INVALID_DATA,
+                                                        "Expected high surrogate char");
+                    }
+                    codeunits.Add((char)wch);
+                    var tmp = utf8Encoding.GetBytes(codeunits.ToArray());
+                    buffer.Write(tmp, 0, tmp.Length);
+                    codeunits.Clear();
+                }
+                else
+                {
+                    var tmp = utf8Encoding.GetBytes(new char[] { (char)wch });
+                    buffer.Write(tmp, 0, tmp.Length);
+                }
             }
+
+
+            if (codeunits.Count > 0)
+            {
+                throw new TProtocolException(TProtocolException.INVALID_DATA,
+                                                "Expected low surrogate char");
+            }
+
             return buffer.ToArray();
         }
 

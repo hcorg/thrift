@@ -29,6 +29,8 @@ nodist_libtestcglib_la_SOURCES = \
 
 libtestcglib_la_LIBADD = $(top_builddir)/lib/c_glib/libthrift_c_glib.la
 
+precross: libtestcglib.la test_client test_server
+
 check_PROGRAMS = \
 	test_client \
 	test_server
@@ -54,7 +56,7 @@ test_server_LDADD = \
 #
 THRIFT = $(top_builddir)/compiler/cpp/thrift
 
-gen-c_glib/t_test_second_service.c  gen-c_glib/t_test_second_service.h  gen-c_glib/t_test_thrift_test.c  gen-c_glib/t_test_thrift_test.h  gen-c_glib/t_test_thrift_test_types.c  gen-c_glib/t_test_thrift_test_types.h: $(top_srcdir)/test/ThriftTest.thrift
+gen-c_glib/t_test_second_service.c  gen-c_glib/t_test_second_service.h  gen-c_glib/t_test_thrift_test.c  gen-c_glib/t_test_thrift_test.h  gen-c_glib/t_test_thrift_test_types.c  gen-c_glib/t_test_thrift_test_types.h: $(top_srcdir)/test/ThriftTest.thrift $(THRIFT)
 	$(THRIFT) --gen c_glib -r $<
 
 AM_CFLAGS = -g -Wall -Wextra $(GLIB_CFLAGS) $(GOBJECT_CFLAGS)
@@ -63,7 +65,7 @@ AM_CPPFLAGS = -I$(top_srcdir)/lib/c_glib/src -Igen-c_glib
 AM_LDFLAGS = $(GLIB_LIBS) $(GOBJECT_LIBS) @GCOV_LDFLAGS@
 
 clean-local:
-	$(RM) -r gen-c_glib
+	$(RM) gen-c_glib/*
 
 EXTRA_DIST = \
 	src/test_client.c \

@@ -24,7 +24,7 @@ package tests
 
 import (
 	thrift "thrift"
-	gomock "code.google.com/p/gomock/gomock"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // Mock of TProtocol interface
@@ -80,9 +80,9 @@ func (_mr *_MockTProtocolRecorder) ReadBool() *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "ReadBool")
 }
 
-func (_m *MockTProtocol) ReadByte() (byte, error) {
+func (_m *MockTProtocol) ReadByte() (int8, error) {
 	ret := _m.ctrl.Call(_m, "ReadByte")
-	ret0, _ := ret[0].(byte)
+	ret0, _ := ret[0].(int8)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -320,7 +320,7 @@ func (_mr *_MockTProtocolRecorder) WriteBool(arg0 interface{}) *gomock.Call {
 	return _mr.mock.ctrl.RecordCall(_mr.mock, "WriteBool", arg0)
 }
 
-func (_m *MockTProtocol) WriteByte(_param0 byte) error {
+func (_m *MockTProtocol) WriteByte(_param0 int8) error {
 	ret := _m.ctrl.Call(_m, "WriteByte", _param0)
 	ret0, _ := ret[0].(error)
 	return ret0

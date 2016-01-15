@@ -26,7 +26,7 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # Put the include dirs which are in the source or build tree
 # before all other include dirs, so the headers in the sources
-# are prefered over the already installed ones
+# are preferred over the already installed ones
 # since cmake 2.4.1
 set(CMAKE_INCLUDE_DIRECTORIES_PROJECT_BEFORE ON)
 
@@ -56,3 +56,15 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
+#
+# "rpath" support.
+# See http://www.itk.org/Wiki/index.php?title=CMake_RPATH_handling
+#
+# On MacOSX, for shared libraries, enable rpath support.
+set(CMAKE_MACOSX_RPATH TRUE)
+#
+# On any OS, for executables, allow linking with shared libraries in non-system
+# locations and running the executables without LD_PRELOAD or similar.
+# This requires the library to be built with rpath support.
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)

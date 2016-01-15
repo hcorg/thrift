@@ -98,7 +98,7 @@ BOOST_AUTO_TEST_CASE(empty_struct_generates_basic_read) {
 }
 
 BOOST_AUTO_TEST_CASE(struct_with_required_field_generates_switch_and_data_check) {
-  t_field f1(t_base_type::type_byte, "f1", 10);
+  t_field f1(t_base_type::type_i8, "f1", 10);
   f1.set_req(t_field::T_REQUIRED);
   tstruct.append(&f1);
 
@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE(struct_with_required_field_generates_switch_and_data_check)
                     "\n"
                     "  switch (fieldId) {\n"
                     "    case 10:\n"
-                    "      if (fieldType == ::apache::thrift::protocol::T_BYTE) {\n"
+                    "      if (fieldType == ::apache::thrift::protocol::T_I8) {\n"
                     "        xfer += iprot->readByte(this->f1);\n"
                     "        f1WasRead = true;\n"
                     "      } else {\n"
@@ -146,7 +146,7 @@ BOOST_AUTO_TEST_CASE(struct_with_required_field_generates_switch_and_data_check)
 }
 
 BOOST_AUTO_TEST_CASE(struct_with_multiple_field_generates_switch_and_data_check) {
-  t_field f1(t_base_type::type_byte, "f1", 10);
+  t_field f1(t_base_type::type_i8, "f1", 10);
   f1.set_req(t_field::T_REQUIRED);
   tstruct.append(&f1);
   t_field f2(t_base_type::type_i32, "f2", 12);
@@ -180,7 +180,7 @@ BOOST_AUTO_TEST_CASE(struct_with_multiple_field_generates_switch_and_data_check)
       "\n"
       "  switch (fieldId) {\n"
       "    case 10:\n"
-      "      if (fieldType == ::apache::thrift::protocol::T_BYTE) {\n"
+      "      if (fieldType == ::apache::thrift::protocol::T_I8) {\n"
       "        xfer += iprot->readByte(this->f1);\n"
       "        f1WasRead = true;\n"
       "      } else {\n"
@@ -355,7 +355,7 @@ BOOST_AUTO_TEST_CASE(map_field_read_and_inserts) {
 }
 
 BOOST_AUTO_TEST_CASE(struct_with_special_field_for_result_generates_different_data_check) {
-  t_field f1(t_base_type::type_byte, "success", 0);
+  t_field f1(t_base_type::type_i8, "success", 0);
   f1.set_req(t_field::T_OPTIONAL);
   tstruct.append(&f1);
 
@@ -377,7 +377,7 @@ BOOST_AUTO_TEST_CASE(struct_with_special_field_for_result_generates_different_da
       "\n"
       "  switch (fieldId) {\n"
       "    case 0:\n"
-      "      if (fieldType == ::apache::thrift::protocol::T_BYTE) {\n"
+      "      if (fieldType == ::apache::thrift::protocol::T_I8) {\n"
       "        xfer += iprot->readByte(*::apache::thrift::initializedOptional(this->success));\n"
       "        successWasRead = true;\n"
       "      } else {\n"

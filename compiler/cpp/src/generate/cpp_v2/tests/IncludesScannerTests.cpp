@@ -58,8 +58,8 @@ BOOST_AUTO_TEST_CASE(double_type_does_not_require_any_header) {
   BOOST_CHECK(isNothingRequired());
 }
 
-BOOST_AUTO_TEST_CASE(byte_type_requires_cstdint_header) {
-  scanner.scan(t_base_type::type_byte);
+BOOST_AUTO_TEST_CASE(i8_type_requires_cstdint_header) {
+  scanner.scan(t_base_type::type_i8);
   BOOST_CHECK(scanner.isCstdintRequired());
 }
 

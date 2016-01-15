@@ -18,9 +18,15 @@ export DH_OPTIONS
 
 PYVERS := $(shell pyversions -r)
 
+export CPPFLAGS:=$(shell dpkg-buildflags --get CPPFLAGS)
+export CFLAGS:=$(shell dpkg-buildflags --get CFLAGS)
+export CXXFLAGS:=$(shell dpkg-buildflags --get CXXFLAGS)
+export LDFLAGS:=$(shell dpkg-buildflags --get LDFLAGS)
+
 configure: configure-stamp
 configure-stamp:
 	dh_testdir
+
 	# Add here commands to configure the package.
 	if [ -f bootstrap.sh ]; then $(CURDIR)/bootstrap.sh; fi
 	$(CURDIR)/configure --prefix=/usr --with-c_glib --without-erlang
@@ -107,11 +113,6 @@ install-indep:
 		$(CURDIR)/debian/libthrift-java/usr/share/java/
 
         # Ruby
-	mkdir -p $(CURDIR)/debian/ruby-thrift/usr/lib/ruby/1.8 && \
-	cp $(CURDIR)/lib/rb/lib/thrift.rb \
-		$(CURDIR)/debian/ruby-thrift/usr/lib/ruby/1.8
-	cp -r $(CURDIR)/lib/rb/lib/thrift \
-		$(CURDIR)/debian/ruby-thrift/usr/lib/ruby/1.8
 	mkdir -p $(CURDIR)/debian/ruby-thrift/usr/lib/ruby/1.9.1 && \
 	cp $(CURDIR)/lib/rb/lib/thrift.rb \
 		$(CURDIR)/debian/ruby-thrift/usr/lib/ruby/1.9.1

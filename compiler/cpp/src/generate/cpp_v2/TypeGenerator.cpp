@@ -57,7 +57,7 @@ void TypeGenerator::throwIfNull(const t_type* type) {
 
 void TypeGenerator::generateBaseType(const t_base_type* type) {
   switch (type->get_base()) {
-  case t_base_type::TYPE_BYTE:
+  case t_base_type::TYPE_I8:
     out() << "std::int8_t";
     return;
   case t_base_type::TYPE_I16:

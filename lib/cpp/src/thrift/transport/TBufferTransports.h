@@ -20,6 +20,7 @@
 #ifndef _THRIFT_TRANSPORT_TBUFFERTRANSPORTS_H_
 #define _THRIFT_TRANSPORT_TBUFFERTRANSPORTS_H_ 1
 
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <boost/scoped_array.hpp>
@@ -308,13 +309,24 @@ public:
   static const int DEFAULT_MAX_FRAME_SIZE = 256 * 1024 * 1024;
 
   /// Use default buffer sizes.
+  TFramedTransport()
+    : transport_(),
+      rBufSize_(0),
+      wBufSize_(DEFAULT_BUFFER_SIZE),
+      rBuf_(),
+      wBuf_(new uint8_t[wBufSize_]),
+      bufReclaimThresh_((std::numeric_limits<uint32_t>::max)()) {
+    initPointers();
+  }
+
   TFramedTransport(boost::shared_ptr<TTransport> transport)
     : transport_(transport),
       rBufSize_(0),
       wBufSize_(DEFAULT_BUFFER_SIZE),
       rBuf_(),
       wBuf_(new uint8_t[wBufSize_]),
-      bufReclaimThresh_((std::numeric_limits<uint32_t>::max)()) {
+      bufReclaimThresh_((std::numeric_limits<uint32_t>::max)()),
+      maxFrameSize_(DEFAULT_MAX_FRAME_SIZE) {
     initPointers();
   }
 
@@ -326,7 +338,8 @@ public:
       wBufSize_(sz),
       rBuf_(),
       wBuf_(new uint8_t[wBufSize_]),
-      bufReclaimThresh_(bufReclaimThresh) {
+      bufReclaimThresh_(bufReclaimThresh),
+      maxFrameSize_(DEFAULT_MAX_FRAME_SIZE) {
     initPointers();
   }
 
@@ -401,7 +414,7 @@ protected:
   boost::scoped_array<uint8_t> rBuf_;
   boost::scoped_array<uint8_t> wBuf_;
   uint32_t bufReclaimThresh_;
-  uint32_t maxFrameSize_ = DEFAULT_MAX_FRAME_SIZE;
+  uint32_t maxFrameSize_;
 };
 
 /**

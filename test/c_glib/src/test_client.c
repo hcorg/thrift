@@ -194,16 +194,17 @@ main (int argc, char **argv)
   /* Execute the actual tests */
   for (test_num = 0; test_num < num_tests; ++test_num) {
     if (thrift_transport_open (transport, &error)) {
-      gchar  *string = NULL;
-      gint8   byte   = 0;
-      gint32  int32  = 0;
-      gint64  int64  = 0;
-      gdouble dub    = 0;
+      gchar   *string  = NULL;
+      gboolean boolean = 0;
+      gint8    byte    = 0;
+      gint32   int32   = 0;
+      gint64   int64   = 0;
+      gdouble  dub     = 0;
 
       gint byte_thing, i32_thing, inner_byte_thing, inner_i32_thing;
       gint64 i64_thing, inner_i64_thing;
 
-      TTestXtruct  *xtruct_out,  *xtruct_in,  *inner_xtruct_in;
+      TTestXtruct  *xtruct_out,  *xtruct_out2, *xtruct_in,  *inner_xtruct_in;
       TTestXtruct2 *xtruct2_out, *xtruct2_in;
 
       GHashTable *map_out, *map_in, *inner_map_in;
@@ -216,8 +217,9 @@ main (int argc, char **argv)
       GArray *list_out, *list_in;
 
       TTestNumberz numberz;
+      TTestNumberz numberz2;
 
-      TTestUserId user_id, *user_id_ptr;
+      TTestUserId user_id, *user_id_ptr, *user_id_ptr2;
 
       TTestInsanity *insanity_out, *insanity_in;
       GHashTable *user_map;
@@ -300,6 +302,42 @@ main (int argc, char **argv)
       }
 
       /**
+       * BOOL TEST
+       */
+      printf ("testByte(true)");
+      if (t_test_thrift_test_if_test_bool (test_client,
+                                           &boolean,
+                                           1,
+                                           &error)) {
+        printf (" = %s\n", boolean ? "true" : "false");
+        if (boolean != 1)
+          fail_count++;
+      }
+      else {
+        printf ("%s\n", error->message);
+        g_error_free (error);
+        error = NULL;
+
+        fail_count++;
+      }
+      printf ("testByte(false)");
+      if (t_test_thrift_test_if_test_bool (test_client,
+                                           &boolean,
+                                           0,
+                                           &error)) {
+        printf (" = %s\n", boolean ? "true" : "false");
+        if (boolean != 0)
+          fail_count++;
+      }
+      else {
+        printf ("%s\n", error->message);
+        g_error_free (error);
+        error = NULL;
+
+        fail_count++;
+      }
+
+      /**
        * BYTE TEST
        */
       printf ("testByte(1)");
@@ -309,6 +347,22 @@ main (int argc, char **argv)
                                            &error)) {
         printf (" = %d\n", byte);
         if (byte != 1)
+          fail_count++;
+      }
+      else {
+        printf ("%s\n", error->message);
+        g_error_free (error);
+        error = NULL;
+
+        fail_count++;
+      }
+      printf ("testByte(-1)");
+      if (t_test_thrift_test_if_test_byte (test_client,
+                                           &byte,
+                                           -1,
+                                           &error)) {
+        printf (" = %d\n", byte);
+        if (byte != -1)
           fail_count++;
       }
       else {
@@ -984,17 +1038,28 @@ main (int argc, char **argv)
                     NULL);
 
       numberz = T_TEST_NUMBERZ_FIVE;
+      numberz2 = T_TEST_NUMBERZ_EIGHT;
       user_id_ptr = g_malloc (sizeof *user_id_ptr);
-      *user_id_ptr = 5000;
+      *user_id_ptr = 5;
+      user_id_ptr2 = g_malloc (sizeof *user_id_ptr);
+      *user_id_ptr2 = 8;
       g_hash_table_insert (user_map, (gpointer)numberz, user_id_ptr);
+      g_hash_table_insert (user_map, (gpointer)numberz2, user_id_ptr2);
       g_hash_table_unref (user_map);
 
       xtruct_out = g_object_new (T_TEST_TYPE_XTRUCT,
-                                 "string_thing", "Truck",
-                                 "byte_thing",   8,
-                                 "i32_thing",    8,
-                                 "i64_thing",    8LL,
+                                 "string_thing", "Hello2",
+                                 "byte_thing",   2,
+                                 "i32_thing",    2,
+                                 "i64_thing",    2LL,
                                  NULL);
+      xtruct_out2 = g_object_new (T_TEST_TYPE_XTRUCT,
+                                 "string_thing", "Goodbye4",
+                                 "byte_thing",   4,
+                                 "i32_thing",    4,
+                                 "i64_thing",    4LL,
+                                 NULL);
+      g_ptr_array_add (xtructs, xtruct_out2);
       g_ptr_array_add (xtructs, xtruct_out);
       g_ptr_array_unref (xtructs);
 

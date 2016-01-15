@@ -19,23 +19,14 @@
 # under the License.
 #
 
-import sys, glob
-from optparse import OptionParser
-parser = OptionParser()
-parser.add_option('--genpydir', type='string', dest='genpydir', default='gen-py')
-options, args = parser.parse_args()
-del sys.argv[1:] # clean up hack so unittest doesn't complain
-sys.path.insert(0, options.genpydir)
-sys.path.insert(0, glob.glob('../../lib/py/build/lib.*')[0])
-
 from ThriftTest.ttypes import *
 from DebugProtoTest.ttypes import CompactProtoTestStruct, Empty
 from thrift.transport import TTransport
-from thrift.transport import TSocket
 from thrift.protocol import TBinaryProtocol, TCompactProtocol, TJSONProtocol
 from thrift.TSerialization import serialize, deserialize
+import sys
 import unittest
-import time
+
 
 class AbstractTest(unittest.TestCase):
 
@@ -268,6 +259,9 @@ class AbstractTest(unittest.TestCase):
     self.assertTrue(len(rep) > 0)
 
   def testIntegerLimits(self):
+    if (sys.version_info[0] == 2 and sys.version_info[1] <= 6):
+      print('Skipping testIntegerLimits for Python 2.6')
+      return
     bad_values = [CompactProtoTestStruct(a_byte=128), CompactProtoTestStruct(a_byte=-129),
                   CompactProtoTestStruct(a_i16=32768), CompactProtoTestStruct(a_i16=-32769),
                   CompactProtoTestStruct(a_i32=2147483648), CompactProtoTestStruct(a_i32=-2147483649),
@@ -277,17 +271,22 @@ class AbstractTest(unittest.TestCase):
     for value in bad_values:
       self.assertRaises(Exception, self._serialize, value)
 
+
 class NormalBinaryTest(AbstractTest):
   protocol_factory = TBinaryProtocol.TBinaryProtocolFactory()
+
 
 class AcceleratedBinaryTest(AbstractTest):
   protocol_factory = TBinaryProtocol.TBinaryProtocolAcceleratedFactory()
 
+
 class CompactProtocolTest(AbstractTest):
   protocol_factory = TCompactProtocol.TCompactProtocolFactory()
 
+
 class JSONProtocolTest(AbstractTest):
   protocol_factory = TJSONProtocol.TJSONProtocolFactory()
+
 
 class AcceleratedFramedTest(unittest.TestCase):
   def testSplit(self):
@@ -305,7 +304,7 @@ class AcceleratedFramedTest(unittest.TestCase):
     prot.writeString(bigstring)
     prot.writeI16(24)
     data = databuf.getvalue()
-    cutpoint = len(data)/2
+    cutpoint = len(data) // 2
     parts = [ data[:cutpoint], data[cutpoint:] ]
 
     framed_buffer = TTransport.TMemoryBuffer()
@@ -346,14 +345,14 @@ class SerializersTest(unittest.TestCase):
     objcopy = Bools()
     deserialize(objcopy, serialize(obj))
     self.assertEquals(obj, objcopy)
-    
+
     # test enums
-    for num, name in Numberz._VALUES_TO_NAMES.iteritems():
+    for num, name in Numberz._VALUES_TO_NAMES.items():
       obj = Bonk(message='enum Numberz value %d is string %s' % (num, name), type=num)
       objcopy = Bonk()
       deserialize(objcopy, serialize(obj))
       self.assertEquals(obj, objcopy)
-  
+
 
 def suite():
   suite = unittest.TestSuite()

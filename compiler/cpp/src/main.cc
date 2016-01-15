@@ -51,6 +51,7 @@
 #include "parse/t_program.h"
 #include "parse/t_scope.h"
 #include "generate/t_generator.h"
+#include "audit/t_audit.h"
 
 #include "version.h"
 
@@ -70,7 +71,7 @@ t_type* g_type_string;
 t_type* g_type_binary;
 t_type* g_type_slist;
 t_type* g_type_bool;
-t_type* g_type_byte;
+t_type* g_type_i8;
 t_type* g_type_i16;
 t_type* g_type_i32;
 t_type* g_type_i64;
@@ -167,6 +168,17 @@ int g_allow_64bit_consts = 0;
  * Flags to control code generation
  */
 bool gen_recurse = false;
+
+/**
+ * Flags to control thrift audit
+ */
+bool g_audit = false;
+
+/**
+ * Flag to control return status
+ */
+bool g_return_failure = false;
+bool g_audit_fatal = true;
 
 /**
  * Win32 doesn't have realpath, so use fallback implementation in that case,
@@ -619,52 +631,43 @@ void dump_docstrings(t_program* program) {
 }
 
 /**
- * Call generate_fingerprint for every structure and enum.
- */
-void generate_all_fingerprints(t_program* program) {
-  const vector<t_struct*>& structs = program->get_structs();
-  vector<t_struct*>::const_iterator s_iter;
-  for (s_iter = structs.begin(); s_iter != structs.end(); ++s_iter) {
-    t_struct* st = *s_iter;
-    st->generate_fingerprint();
-  }
-
-  const vector<t_struct*>& xceptions = program->get_xceptions();
-  vector<t_struct*>::const_iterator x_iter;
-  for (x_iter = xceptions.begin(); x_iter != xceptions.end(); ++x_iter) {
-    t_struct* st = *x_iter;
-    st->generate_fingerprint();
-  }
-
-  const vector<t_enum*>& enums = program->get_enums();
-  vector<t_enum*>::const_iterator e_iter;
-  for (e_iter = enums.begin(); e_iter != enums.end(); ++e_iter) {
-    t_enum* e = *e_iter;
-    e->generate_fingerprint();
-  }
-
-  g_type_void->generate_fingerprint();
-
-  // If you want to generate fingerprints for implicit structures, start here.
-  /*
-  const vector<t_service*>& services = program->get_services();
-  vector<t_service*>::const_iterator v_iter;
-  for (v_iter = services.begin(); v_iter != services.end(); ++v_iter) {
-    t_service* sv = *v_iter;
-  }
-  */
-}
-
-/**
  * Emits a warning on list<byte>, binary type is typically a much better choice.
  */
 void check_for_list_of_bytes(t_type* list_elem_type) {
   if ((g_parse_mode == PROGRAM) && (list_elem_type != NULL) && list_elem_type->is_base_type()) {
     t_base_type* tbase = (t_base_type*)list_elem_type;
-    if (tbase->get_base() == t_base_type::TYPE_BYTE) {
+    if (tbase->get_base() == t_base_type::TYPE_I8) {
       pwarning(1, "Consider using the more efficient \"binary\" type instead of \"list<byte>\".");
     }
   }
+}
+
+static bool g_byte_warning_emitted = false;
+
+/**
+ * Emits a one-time warning on byte type, promoting the new i8 type instead
+ */
+void emit_byte_type_warning() {
+  if (!g_byte_warning_emitted) {
+    pwarning(1,
+             "The \"byte\" type is a compatibility alias for \"i8\". Use \"i8\" to emphasize the "
+             "signedness of this type.\n");
+    g_byte_warning_emitted = true;
+  }
+}
+
+/**
+ * Prints deprecation notice for old NS declarations that are no longer supported
+ * If new_form is NULL, old_form is assumed to be a language identifier, such as "cpp"
+ * If new_form is not NULL, both arguments are used exactly as given
+ */
+void error_unsupported_namespace_decl(const char* old_form, const char* new_form) {
+  const char* remainder = "";
+  if( new_form == NULL) {
+    new_form = old_form;
+    remainder = "_namespace";
+  }
+  failure("Unsupported declaration '%s%s'. Use 'namespace %s' instead.", old_form, remainder, new_form);
 }
 
 /**
@@ -711,6 +714,13 @@ void help() {
   fprintf(stderr, "                Keys and values are options passed to the generator.\n");
   fprintf(stderr, "                Many options will not require values.\n");
   fprintf(stderr, "\n");
+  fprintf(stderr, "Options related to audit operation\n");
+  fprintf(stderr, "   --audit OldFile   Old Thrift file to be audited with 'file'\n");
+  fprintf(stderr, "  -Iold dir    Add a directory to the list of directories\n");
+  fprintf(stderr, "                searched for include directives for old thrift file\n");
+  fprintf(stderr, "  -Inew dir    Add a directory to the list of directories\n");
+  fprintf(stderr, "                searched for include directives for new thrift file\n");
+  fprintf(stderr, "\n");
   fprintf(stderr, "Available generators (and options):\n");
 
   t_generator_registry::gen_map_t gen_map = t_generator_registry::get_generator_map();
@@ -751,7 +761,7 @@ void validate_const_rec(std::string name, t_type* type, t_const_value* value) {
         throw "type error: const \"" + name + "\" was declared as bool";
       }
       break;
-    case t_base_type::TYPE_BYTE:
+    case t_base_type::TYPE_I8:
       if (value->get_type() != t_const_value::CV_INTEGER) {
         throw "type error: const \"" + name + "\" was declared as byte";
       }
@@ -1029,6 +1039,32 @@ void generate(t_program* program, const vector<string>& generator_strings) {
   }
 }
 
+void audit(t_program* new_program,
+           t_program* old_program,
+           string new_thrift_include_path,
+           string old_thrift_include_path) {
+  vector<string> temp_incl_searchpath = g_incl_searchpath;
+  if (!old_thrift_include_path.empty()) {
+    g_incl_searchpath.push_back(old_thrift_include_path);
+  }
+
+  parse(old_program, NULL);
+
+  g_incl_searchpath = temp_incl_searchpath;
+  if (!new_thrift_include_path.empty()) {
+    g_incl_searchpath.push_back(new_thrift_include_path);
+  }
+
+  parse(new_program, NULL);
+
+  compare_namespace(new_program, old_program);
+  compare_services(new_program->get_services(), old_program->get_services());
+  compare_enums(new_program->get_enums(), old_program->get_enums());
+  compare_structs(new_program->get_structs(), old_program->get_structs());
+  compare_structs(new_program->get_xceptions(), old_program->get_xceptions());
+  compare_consts(new_program->get_consts(), old_program->get_consts());
+}
+
 /**
  * Parse it up.. then spit it back out, in pretty much every language. Alright
  * not that many languages, but the cool ones that we care about.
@@ -1049,6 +1085,9 @@ int main(int argc, char** argv) {
   }
 
   vector<string> generator_strings;
+  string old_thrift_include_path;
+  string new_thrift_include_path;
+  string old_input_file;
 
   // Set the current path to a dummy value to make warning messages clearer.
   g_curpath = "arguments";
@@ -1111,13 +1150,42 @@ int main(int argc, char** argv) {
 
 #ifdef _WIN32
         // strip out trailing \ on Windows
-        int last = out_path.length() - 1;
+        std::string::size_type last = out_path.length() - 1;
         if (out_path[last] == '\\') {
           out_path.erase(last);
         }
 #endif
         if (!check_is_directory(out_path.c_str()))
           return -1;
+      } else if (strcmp(arg, "-audit") == 0) {
+        g_audit = true;
+        arg = argv[++i];
+        if (arg == NULL) {
+          fprintf(stderr, "Missing old thrift file name for audit operation\n");
+          usage();
+        }
+        char old_thrift_file_rp[THRIFT_PATH_MAX];
+
+        if (saferealpath(arg, old_thrift_file_rp) == NULL) {
+          failure("Could not open input file with realpath: %s", arg);
+        }
+        old_input_file = string(old_thrift_file_rp);
+      } else if (strcmp(arg, "-audit-nofatal") == 0) {
+        g_audit_fatal = false;
+      } else if (strcmp(arg, "-Iold") == 0) {
+        arg = argv[++i];
+        if (arg == NULL) {
+          fprintf(stderr, "Missing Include directory for old thrift file\n");
+          usage();
+        }
+        old_thrift_include_path = string(arg);
+      } else if (strcmp(arg, "-Inew") == 0) {
+        arg = argv[++i];
+        if (arg == NULL) {
+          fprintf(stderr, "Missing Include directory for new thrift file\n");
+          usage();
+        }
+        new_thrift_include_path = string(arg);
       } else {
         fprintf(stderr, "Unrecognized option: %s\n", arg);
         usage();
@@ -1139,72 +1207,103 @@ int main(int argc, char** argv) {
     exit(0);
   }
 
-  // You gotta generate something!
-  if (generator_strings.empty()) {
-    fprintf(stderr, "No output language(s) specified\n");
-    usage();
-  }
-
-  // Real-pathify it
-  char rp[THRIFT_PATH_MAX];
-  if (argv[i] == NULL) {
-    fprintf(stderr, "Missing file name\n");
-    usage();
-  }
-  if (saferealpath(argv[i], rp) == NULL) {
-    failure("Could not open input file with realpath: %s", argv[i]);
-  }
-  string input_file(rp);
-
-  // Instance of the global parse tree
-  t_program* program = new t_program(input_file);
-  if (out_path.size()) {
-    program->set_out_path(out_path, out_path_is_absolute);
-  }
-
-  // Compute the cpp include prefix.
-  // infer this from the filename passed in
-  string input_filename = argv[i];
-  string include_prefix;
-
-  string::size_type last_slash = string::npos;
-  if ((last_slash = input_filename.rfind("/")) != string::npos) {
-    include_prefix = input_filename.substr(0, last_slash);
-  }
-
-  program->set_include_prefix(include_prefix);
-
   // Initialize global types
   g_type_void = t_base_type::type_void;
   g_type_string = t_base_type::type_string;
   g_type_binary = t_base_type::type_binary;
   g_type_slist = t_base_type::type_slist;
   g_type_bool = t_base_type::type_bool;
-  g_type_byte = t_base_type::type_byte;
+  g_type_i8 = t_base_type::type_i8;
   g_type_i16 = t_base_type::type_i16;
   g_type_i32 = t_base_type::type_i32;
   g_type_i64 = t_base_type::type_i64;
   g_type_double = t_base_type::type_double;
 
-  // Parse it!
-  parse(program, NULL);
+  if (g_audit) {
+    // Audit operation
 
-  // The current path is not really relevant when we are doing generation.
-  // Reset the variable to make warning messages clearer.
-  g_curpath = "generation";
-  // Reset yylineno for the heck of it.  Use 1 instead of 0 because
-  // That is what shows up during argument parsing.
-  yylineno = 1;
+    if (old_input_file.empty()) {
+      fprintf(stderr, "Missing file name of old thrift file for audit\n");
+      usage();
+    }
 
-  // Generate it!
-  generate(program, generator_strings);
+    char new_thrift_file_rp[THRIFT_PATH_MAX];
+    if (argv[i] == NULL) {
+      fprintf(stderr, "Missing file name of new thrift file for audit\n");
+      usage();
+    }
+    if (saferealpath(argv[i], new_thrift_file_rp) == NULL) {
+      failure("Could not open input file with realpath: %s", argv[i]);
+    }
+    string new_input_file(new_thrift_file_rp);
+
+    t_program new_program(new_input_file);
+    t_program old_program(old_input_file);
+
+    audit(&new_program, &old_program, new_thrift_include_path, old_thrift_include_path);
+
+  } else {
+    // Generate options
+
+    // You gotta generate something!
+    if (generator_strings.empty()) {
+      fprintf(stderr, "No output language(s) specified\n");
+      usage();
+    }
+
+    // Real-pathify it
+    char rp[THRIFT_PATH_MAX];
+    if (argv[i] == NULL) {
+      fprintf(stderr, "Missing file name\n");
+      usage();
+    }
+    if (saferealpath(argv[i], rp) == NULL) {
+      failure("Could not open input file with realpath: %s", argv[i]);
+    }
+    string input_file(rp);
+
+    // Instance of the global parse tree
+    t_program* program = new t_program(input_file);
+    if (out_path.size()) {
+      program->set_out_path(out_path, out_path_is_absolute);
+    }
+
+    // Compute the cpp include prefix.
+    // infer this from the filename passed in
+    string input_filename = argv[i];
+    string include_prefix;
+
+    string::size_type last_slash = string::npos;
+    if ((last_slash = input_filename.rfind("/")) != string::npos) {
+      include_prefix = input_filename.substr(0, last_slash);
+    }
+
+    program->set_include_prefix(include_prefix);
+
+    // Parse it!
+    parse(program, NULL);
+
+    // The current path is not really relevant when we are doing generation.
+    // Reset the variable to make warning messages clearer.
+    g_curpath = "generation";
+    // Reset yylineno for the heck of it.  Use 1 instead of 0 because
+    // That is what shows up during argument parsing.
+    yylineno = 1;
+
+    // Generate it!
+    generate(program, generator_strings);
+    delete program;
+  }
 
   // Clean up. Who am I kidding... this program probably orphans heap memory
   // all over the place, but who cares because it is about to exit and it is
   // all referenced and used by this wacky parse tree up until now anyways.
 
-  delete program;
 
+  // Finished
+  if (g_return_failure && g_audit_fatal) {
+    exit(2);
+  }
   // Finished
   return 0;
 }

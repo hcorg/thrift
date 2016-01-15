@@ -56,7 +56,7 @@ BOOST_AUTO_TEST_CASE(null_type_throws) {
 }
 
 BOOST_AUTO_TEST_CASE(byte_type_generates_int8_t) {
-  BOOST_CHECK_EQUAL(generate(t_base_type::type_byte), "std::int8_t");
+  BOOST_CHECK_EQUAL(generate(t_base_type::type_i8), "std::int8_t");
 }
 
 BOOST_AUTO_TEST_CASE(i16_type_generates_int16_t) {
@@ -126,24 +126,24 @@ BOOST_AUTO_TEST_CASE(type_from_different_namespace_appends_namespace_prefix) {
 }
 
 BOOST_AUTO_TEST_CASE(list_type_generates_vector) {
-  t_list l(t_base_type::type_byte);
+  t_list l(t_base_type::type_i8);
   BOOST_CHECK_EQUAL(generate(&l), "std::vector<std::int8_t>");
 }
 
 BOOST_AUTO_TEST_CASE(list_type_generates_subsituted_type) {
-  t_list l(t_base_type::type_byte);
+  t_list l(t_base_type::type_i8);
   l.set_cpp_name("QList");
 
   BOOST_CHECK_EQUAL(generate(&l), "QList");
 }
 
 BOOST_AUTO_TEST_CASE(set_type_generates_unordered_set) {
-  t_set c(t_base_type::type_byte);
+  t_set c(t_base_type::type_i8);
   BOOST_CHECK_EQUAL(generate(&c), "std::unordered_set<std::int8_t>");
 }
 
 BOOST_AUTO_TEST_CASE(set_type_generates_subsituted_type) {
-  t_set c(t_base_type::type_byte);
+  t_set c(t_base_type::type_i8);
   c.set_cpp_name("QSet");
 
   BOOST_CHECK_EQUAL(generate(&c), "QSet");

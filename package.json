@@ -12,6 +12,7 @@
     "email": "dev@thrift.apache.org",
     "url": "http://thrift.apache.org"
   },
+  "license": "Apache-2.0",
   "licenses": [
     {
       "type": "Apache-2.0",
@@ -22,6 +23,10 @@
     "mail": "dev@thrift.apache.org",
     "url": "https://issues.apache.org/jira/browse/THRIFT"
   },
+  "files": [
+    "lib/nodejs/lib/thrift",
+    "lib/nodejs/README.md"
+  ],
   "directories": {
     "lib": "./lib/nodejs/lib/thrift"
   },
@@ -35,6 +40,7 @@
     "ws": "~0.4.32"
   },
   "devDependencies": {
+    "buffer-equals": "^1.0.3",
     "commander": "2.1.x",
     "connect": "2.7.x",
     "istanbul": "^0.3.5",

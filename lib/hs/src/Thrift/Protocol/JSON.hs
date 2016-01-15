@@ -33,6 +33,8 @@ import Control.Monad
 import Data.Attoparsec.ByteString as P
 import Data.Attoparsec.ByteString.Char8 as PC
 import Data.Attoparsec.ByteString.Lazy as LP
+import Data.ByteString.Base64.Lazy as B64C
+import Data.ByteString.Base64 as B64
 import Data.ByteString.Lazy.Builder as B
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Functor
@@ -49,9 +51,10 @@ import Thrift.Transport
 import Thrift.Types
 
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Lazy.Char8 as LBSC
 import qualified Data.Text.Lazy as LT
 
--- | The JSON Protocol data uses the standard 'TSimpleJSONProtocol'.  Data is
+-- | The JSON Protocol data uses the standard 'TJSONProtocol'.  Data is
 -- encoded as a JSON 'ByteString'
 data JSONProtocol t = JSONProtocol t
                       -- ^ Construct a 'JSONProtocol' with a 'Transport'
@@ -105,13 +108,14 @@ buildJSONValue (TList ty entries) =
    else mempty) <>
   B.char8 ']'
 buildJSONValue (TSet ty entries) = buildJSONValue (TList ty entries)
-buildJSONValue (TBool b) = if b then B.string8 "true" else B.string8 "false"
+buildJSONValue (TBool b) = if b then B.char8 '1' else B.char8 '0'
 buildJSONValue (TByte b) = buildShowable b
 buildJSONValue (TI16 i) = buildShowable i
 buildJSONValue (TI32 i) = buildShowable i
 buildJSONValue (TI64 i) = buildShowable i
 buildJSONValue (TDouble d) = buildShowable d
 buildJSONValue (TString s) = B.char8 '\"' <> escape s <> B.char8 '\"'
+buildJSONValue (TBinary s) = B.char8 '\"' <> (B.lazyByteString . B64C.encode $ s) <> B.char8 '\"'
 
 buildJSONStruct :: Map.HashMap Int16 (LT.Text, ThriftVal) -> Builder
 buildJSONStruct = mconcat . intersperse (B.char8 ',') . Map.foldrWithKey buildField []
@@ -149,22 +153,25 @@ parseJSONValue (T_MAP kt vt) = fmap (TMap kt vt) $
     between '{' '}' (parseJSONMap kt vt)
 parseJSONValue (T_LIST ty) = fmap (TList ty) $
   between '[' ']' $ do
-    len <- lexeme escapedString *> lexeme (PC.char8 ',') *>
-           lexeme decimal <* lexeme (PC.char8 ',')
-    if len > 0 then parseJSONList ty else return []
+    len <- lexeme escapedString *> lexeme (PC.char8 ',') *> lexeme decimal
+    if len > 0
+      then lexeme (PC.char8 ',') *> parseJSONList ty
+      else return []
 parseJSONValue (T_SET ty) = fmap (TSet ty) $
   between '[' ']' $ do
-    len <- lexeme escapedString *> lexeme (PC.char8 ',') *>
-           lexeme decimal <* lexeme (PC.char8 ',')
-    if len > 0 then parseJSONList ty else return []
+    len <- lexeme escapedString *> lexeme (PC.char8 ',') *> lexeme decimal
+    if len > 0
+      then  lexeme (PC.char8 ',') *> parseJSONList ty
+      else return []
 parseJSONValue T_BOOL =
-  (TBool True <$ string "true") <|> (TBool False <$ string "false")
+  (TBool True <$ PC.char8 '1') <|> (TBool False <$ PC.char8 '0')
 parseJSONValue T_BYTE = TByte <$> signed decimal
 parseJSONValue T_I16 = TI16 <$> signed decimal
 parseJSONValue T_I32 = TI32 <$> signed decimal
 parseJSONValue T_I64 = TI64 <$> signed decimal
 parseJSONValue T_DOUBLE = TDouble <$> double
 parseJSONValue T_STRING = TString <$> escapedString
+parseJSONValue T_BINARY = TBinary <$> base64String
 parseJSONValue T_STOP = fail "parseJSONValue: cannot parse type T_STOP"
 parseJSONValue T_VOID = fail "parseJSONValue: cannot parse type T_VOID"
 
@@ -179,6 +186,7 @@ parseAnyValue = choice $
                   , T_I64
                   , T_DOUBLE
                   , T_STRING
+                  , T_BINARY
                   ]
   where
     skipBetween :: Char -> Char -> Parser ()
@@ -200,9 +208,13 @@ parseJSONStruct tmap = Map.fromList . catMaybes <$> parseField
 
 parseJSONMap :: ThriftType -> ThriftType -> Parser [(ThriftVal, ThriftVal)]
 parseJSONMap kt vt =
-  ((,) <$> lexeme (PC.char8 '"' *> parseJSONValue kt <* PC.char8 '"') <*>
+  ((,) <$> lexeme (parseJSONKey kt) <*>
    (lexeme (PC.char8 ':') *> lexeme (parseJSONValue vt))) `sepBy`
   lexeme (PC.char8 ',')
+  where
+    parseJSONKey T_STRING = parseJSONValue T_STRING
+    parseJSONKey T_BINARY = parseJSONValue T_BINARY
+    parseJSONKey kt = PC.char8 '"' *> parseJSONValue kt <* PC.char8 '"'
 
 parseJSONList :: ThriftType -> Parser [ThriftVal]
 parseJSONList ty = lexeme (parseJSONValue ty) `sepBy` lexeme (PC.char8 ',')
@@ -211,6 +223,20 @@ escapedString :: Parser LBS.ByteString
 escapedString = PC.char8 '"' *>
                 (LBS.pack <$> P.many' (escapedChar <|> notChar8 '"')) <*
                 PC.char8 '"'
+
+base64String :: Parser LBS.ByteString
+base64String = PC.char8 '"' *>
+               (decodeBase64 . LBSC.pack <$> P.many' (PC.notChar '"')) <*
+               PC.char8 '"'
+               where
+                 decodeBase64 b =
+                   let padded = case (LBS.length b) `mod` 4 of
+                                  2 -> LBS.append b "=="
+                                  3 -> LBS.append b "="
+                                  _ -> b in
+                   case B64C.decode padded of
+                     Right s -> s
+                     Left x -> error x
 
 escapedChar :: Parser Word8
 escapedChar = PC.char8 '\\' *> (c2w <$> choice
@@ -321,5 +347,6 @@ getTypeName ty = B.string8 $ case ty of
   T_I64      -> "i64"
   T_DOUBLE   -> "dbl"
   T_STRING   -> "str"
+  T_BINARY   -> "str"
   _ -> error "Unrecognized Type"
 

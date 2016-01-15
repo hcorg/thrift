@@ -32,7 +32,7 @@
 # if defined(_MSC_VER) && _MSC_VER < 1600
    typedef int _Bool;
 #  define bool _Bool
-#  define false 0 
+#  define false 0
 #  define true 1
 # endif
 # define inline __inline
@@ -124,11 +124,6 @@ typedef enum TType {
 #define INT_CONV_ERROR_OCCURRED(v) ( ((v) == -1) && PyErr_Occurred() )
 #define CHECK_RANGE(v, min, max) ( ((v) <= (max)) && ((v) >= (min)) )
 
-// Py_ssize_t was not defined before Python 2.5
-#if (PY_VERSION_HEX < 0x02050000)
-typedef int Py_ssize_t;
-#endif
-
 /**
  * A cache of the spec_args for a set or list,
  * so we don't have to keep calling PyTuple_GET_ITEM.
@@ -136,6 +131,7 @@ typedef int Py_ssize_t;
 typedef struct {
   TType element_type;
   PyObject* typeargs;
+  bool immutable;
 } SetListTypeArgs;
 
 /**
@@ -147,6 +143,7 @@ typedef struct {
   TType vtag;
   PyObject* ktypeargs;
   PyObject* vtypeargs;
+  bool immutable;
 } MapTypeArgs;
 
 /**
@@ -156,6 +153,7 @@ typedef struct {
 typedef struct {
   PyObject* klass;
   PyObject* spec;
+  bool immutable;
 } StructTypeArgs;
 
 /**
@@ -191,7 +189,19 @@ check_ssize_t_32(Py_ssize_t len) {
     return false;
   }
   if (!CHECK_RANGE(len, 0, INT32_MAX)) {
-    PyErr_SetString(PyExc_OverflowError, "string size out of range");
+    PyErr_SetString(PyExc_OverflowError, "size out of range: exceeded INT32_MAX");
+    return false;
+  }
+  return true;
+}
+
+static inline bool
+check_length_limit(Py_ssize_t len, long limit) {
+  if (!check_ssize_t_32(len)) {
+    return false;
+  }
+  if (len > limit) {
+    PyErr_Format(PyExc_OverflowError, "size exceeded specified limit: %d", limit);
     return false;
   }
   return true;
@@ -213,13 +223,17 @@ parse_pyint(PyObject* o, int32_t* ret, int32_t min, int32_t max) {
   return true;
 }
 
+static bool
+is_utf8(PyObject* typeargs) {
+  return PyString_Check(typeargs) && !strncmp(PyString_AS_STRING(typeargs), "UTF8", 4);
+}
 
 /* --- FUNCTIONS TO PARSE STRUCT SPECIFICATOINS --- */
 
 static bool
 parse_set_list_args(SetListTypeArgs* dest, PyObject* typeargs) {
-  if (PyTuple_Size(typeargs) != 2) {
-    PyErr_SetString(PyExc_TypeError, "expecting tuple of size 2 for list/set type args");
+  if (PyTuple_Size(typeargs) != 3) {
+    PyErr_SetString(PyExc_TypeError, "expecting tuple of size 3 for list/set type args");
     return false;
   }
 
@@ -230,13 +244,15 @@ parse_set_list_args(SetListTypeArgs* dest, PyObject* typeargs) {
 
   dest->typeargs = PyTuple_GET_ITEM(typeargs, 1);
 
+  dest->immutable = Py_True == PyTuple_GET_ITEM(typeargs, 2);
+
   return true;
 }
 
 static bool
 parse_map_args(MapTypeArgs* dest, PyObject* typeargs) {
-  if (PyTuple_Size(typeargs) != 4) {
-    PyErr_SetString(PyExc_TypeError, "expecting 4 arguments for typeargs to map");
+  if (PyTuple_Size(typeargs) != 5) {
+    PyErr_SetString(PyExc_TypeError, "expecting 5 arguments for typeargs to map");
     return false;
   }
 
@@ -252,6 +268,7 @@ parse_map_args(MapTypeArgs* dest, PyObject* typeargs) {
 
   dest->ktypeargs = PyTuple_GET_ITEM(typeargs, 1);
   dest->vtypeargs = PyTuple_GET_ITEM(typeargs, 3);
+  dest->immutable = Py_True == PyTuple_GET_ITEM(typeargs, 4);
 
   return true;
 }
@@ -274,7 +291,7 @@ parse_struct_item_spec(StructItemSpec* dest, PyObject* spec_tuple) {
 
   // i'd like to use ParseArgs here, but it seems to be a bottleneck.
   if (PyTuple_Size(spec_tuple) != 5) {
-    PyErr_SetString(PyExc_TypeError, "expecting 5 arguments for spec tuple");
+    PyErr_Format(PyExc_TypeError, "expecting 5 arguments for spec tuple but got %d", (int)PyTuple_Size(spec_tuple));
     return false;
   }
 
@@ -334,7 +351,7 @@ static void writeDouble(PyObject* outbuf, double dub) {
 
 /* --- MAIN RECURSIVE OUTPUT FUNCTION -- */
 
-static int
+static bool
 output_val(PyObject* output, PyObject* value, TType type, PyObject* typeargs) {
   /*
    * Refcounting Strategy:
@@ -414,7 +431,10 @@ output_val(PyObject* output, PyObject* value, TType type, PyObject* typeargs) {
   }
 
   case T_STRING: {
-    Py_ssize_t len = PyString_Size(value);
+    Py_ssize_t len = 0;
+    if (is_utf8(typeargs) && PyUnicode_Check(value))
+      value = PyUnicode_AsUTF8String(value);
+    len = PyString_Size(value);
 
     if (!check_ssize_t_32(len)) {
       return false;
@@ -868,13 +888,23 @@ skip(DecodeBuffer* input, TType type) {
 /* --- HELPER FUNCTION FOR DECODE_VAL --- */
 
 static PyObject*
-decode_val(DecodeBuffer* input, TType type, PyObject* typeargs);
+decode_val(DecodeBuffer* input, TType type, PyObject* typeargs, long string_limit, long container_limit);
 
-static bool
-decode_struct(DecodeBuffer* input, PyObject* output, PyObject* spec_seq) {
+static PyObject*
+decode_struct(DecodeBuffer* input, PyObject* output, PyObject* klass, PyObject* spec_seq, long string_limit, long container_limit) {
   int spec_seq_len = PyTuple_Size(spec_seq);
+  bool immutable = output == Py_None;
+  PyObject* kwargs = NULL;
   if (spec_seq_len == -1) {
-    return false;
+    return NULL;
+  }
+
+  if (immutable) {
+    kwargs = PyDict_New();
+    if (!kwargs) {
+      PyErr_SetString(PyExc_TypeError, "failed to prepare kwargument storage");
+      return NULL;
+    }
   }
 
   while (true) {
@@ -886,14 +916,14 @@ decode_struct(DecodeBuffer* input, PyObject* output, PyObject* spec_seq) {
 
     type = readByte(input);
     if (type == -1) {
-      return false;
+      goto error;
     }
     if (type == T_STOP) {
       break;
     }
     tag = readI16(input);
     if (INT_CONV_ERROR_OCCURRED(tag)) {
-      return false;
+      goto error;
     }
     if (tag >= 0 && tag < spec_seq_len) {
       item_spec = PyTuple_GET_ITEM(spec_seq, tag);
@@ -903,36 +933,54 @@ decode_struct(DecodeBuffer* input, PyObject* output, PyObject* spec_seq) {
 
     if (item_spec == Py_None) {
       if (!skip(input, type)) {
-        return false;
+        goto error;
       } else {
         continue;
       }
     }
 
     if (!parse_struct_item_spec(&parsedspec, item_spec)) {
-      return false;
+      goto error;
     }
     if (parsedspec.type != type) {
       if (!skip(input, type)) {
-        PyErr_SetString(PyExc_TypeError, "struct field had wrong type while reading and can't be skipped");
-        return false;
+        PyErr_Format(PyExc_TypeError, "struct field had wrong type: expected %d but got %d", parsedspec.type, type);
+        goto error;
       } else {
         continue;
       }
     }
 
-    fieldval = decode_val(input, parsedspec.type, parsedspec.typeargs);
+    fieldval = decode_val(input, parsedspec.type, parsedspec.typeargs, string_limit, container_limit);
     if (fieldval == NULL) {
-      return false;
+      goto error;
     }
 
-    if (PyObject_SetAttr(output, parsedspec.attrname, fieldval) == -1) {
+    if ((immutable && PyDict_SetItem(kwargs, parsedspec.attrname, fieldval) == -1)
+        || (!immutable && PyObject_SetAttr(output, parsedspec.attrname, fieldval) == -1)) {
       Py_DECREF(fieldval);
-      return false;
+      goto error;
     }
     Py_DECREF(fieldval);
   }
-  return true;
+  if (immutable) {
+    PyObject* args = PyTuple_New(0);
+    PyObject* ret = NULL;
+    if (!args) {
+      PyErr_SetString(PyExc_TypeError, "failed to prepare argument storage");
+      goto error;
+    }
+    ret = PyObject_Call(klass, args, kwargs);
+    Py_DECREF(kwargs);
+    Py_DECREF(args);
+    return ret;
+  }
+  Py_INCREF(output);
+  return output;
+
+  error:
+  Py_XDECREF(kwargs);
+  return NULL;
 }
 
 
@@ -940,7 +988,7 @@ decode_struct(DecodeBuffer* input, PyObject* output, PyObject* spec_seq) {
 
 // Returns a new reference.
 static PyObject*
-decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
+decode_val(DecodeBuffer* input, TType type, PyObject* typeargs, long string_limit, long container_limit) {
   switch (type) {
 
   case T_BOOL: {
@@ -1008,8 +1056,14 @@ decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
     if (!readBytes(input, &buf, len)) {
       return NULL;
     }
+    if (!check_length_limit(len, string_limit)) {
+      return NULL;
+    }
 
-    return PyString_FromStringAndSize(buf, len);
+    if (is_utf8(typeargs))
+      return PyUnicode_DecodeUTF8(buf, len, 0);
+    else
+      return PyString_FromStringAndSize(buf, len);
   }
 
   case T_LIST:
@@ -1018,6 +1072,7 @@ decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
     int32_t len;
     PyObject* ret = NULL;
     int i;
+    bool use_tuple = false;
 
     if (!parse_set_list_args(&parsedargs, typeargs)) {
       return NULL;
@@ -1028,35 +1083,34 @@ decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
     }
 
     len = readI32(input);
-    if (!check_ssize_t_32(len)) {
+    if (!check_length_limit(len, container_limit)) {
       return NULL;
     }
 
-    ret = PyList_New(len);
+    use_tuple = type == T_LIST && parsedargs.immutable;
+    ret = use_tuple ? PyTuple_New(len) : PyList_New(len);
     if (!ret) {
       return NULL;
     }
 
     for (i = 0; i < len; i++) {
-      PyObject* item = decode_val(input, parsedargs.element_type, parsedargs.typeargs);
+      PyObject* item = decode_val(input, parsedargs.element_type, parsedargs.typeargs, string_limit, container_limit);
       if (!item) {
         Py_DECREF(ret);
         return NULL;
       }
-      PyList_SET_ITEM(ret, i, item);
+      if (use_tuple) {
+        PyTuple_SET_ITEM(ret, i, item);
+      } else  {
+        PyList_SET_ITEM(ret, i, item);
+      }
     }
 
     // TODO(dreiss): Consider biting the bullet and making two separate cases
     //               for list and set, avoiding this post facto conversion.
     if (type == T_SET) {
       PyObject* setret;
-#if (PY_VERSION_HEX < 0x02050000)
-      // hack needed for older versions
-      setret = PyObject_CallFunctionObjArgs((PyObject*)&PySet_Type, ret, NULL);
-#else
-      // official version
-      setret = PySet_New(ret);
-#endif
+      setret = parsedargs.immutable ? PyFrozenSet_New(ret) : PySet_New(ret);
       Py_DECREF(ret);
       return setret;
     }
@@ -1081,8 +1135,8 @@ decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
     }
 
     len = readI32(input);
-    if (!check_ssize_t_32(len)) {
-      return false;
+    if (!check_length_limit(len, container_limit)) {
+      return NULL;
     }
 
     ret = PyDict_New();
@@ -1093,11 +1147,11 @@ decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
     for (i = 0; i < len; i++) {
       PyObject* k = NULL;
       PyObject* v = NULL;
-      k = decode_val(input, parsedargs.ktag, parsedargs.ktypeargs);
+      k = decode_val(input, parsedargs.ktag, parsedargs.ktypeargs, string_limit, container_limit);
       if (k == NULL) {
         goto loop_error;
       }
-      v = decode_val(input, parsedargs.vtag, parsedargs.vtypeargs);
+      v = decode_val(input, parsedargs.vtag, parsedargs.vtypeargs, string_limit, container_limit);
       if (v == NULL) {
         goto loop_error;
       }
@@ -1116,6 +1170,22 @@ decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
       goto error;
     }
 
+    if (parsedargs.immutable) {
+      PyObject* thrift = PyImport_ImportModule("thrift.Thrift");
+      PyObject* cls = NULL;
+      PyObject* arg = NULL;
+      if (!thrift) {
+        goto error;
+      }
+      cls = PyObject_GetAttrString(thrift, "TFrozenDict");
+      if (!cls) {
+        goto error;
+      }
+      arg = PyTuple_New(1);
+      PyTuple_SET_ITEM(arg, 0, ret);
+      return PyObject_CallObject(cls, arg);
+    }
+
     return ret;
 
     error:
@@ -1125,22 +1195,11 @@ decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
 
   case T_STRUCT: {
     StructTypeArgs parsedargs;
-	PyObject* ret;
     if (!parse_struct_args(&parsedargs, typeargs)) {
       return NULL;
     }
 
-    ret = PyObject_CallObject(parsedargs.klass, NULL);
-    if (!ret) {
-      return NULL;
-    }
-
-    if (!decode_struct(input, ret, parsedargs.spec)) {
-      Py_DECREF(ret);
-      return NULL;
-    }
-
-    return ret;
+    return decode_struct(input, Py_None, parsedargs.klass, parsedargs.spec, string_limit, container_limit);
   }
 
   case T_STOP:
@@ -1154,6 +1213,15 @@ decode_val(DecodeBuffer* input, TType type, PyObject* typeargs) {
   }
 }
 
+static long as_long_or(PyObject* value, long default_value) {
+  long v = PyInt_AsLong(value);
+  if (INT_CONV_ERROR_OCCURRED(v)) {
+    PyErr_Clear();
+    return default_value;
+  }
+  return v;
+}
+
 
 /* --- TOP-LEVEL WRAPPER FOR INPUT -- */
 
@@ -1163,11 +1231,18 @@ decode_binary(PyObject *self, PyObject *args) {
   PyObject* transport = NULL;
   PyObject* typeargs = NULL;
   StructTypeArgs parsedargs;
+  PyObject* string_limit_obj = NULL;
+  PyObject* container_limit_obj = NULL;
+  long string_limit = 0;
+  long container_limit = 0;
   DecodeBuffer input = {0, 0};
-  
-  if (!PyArg_ParseTuple(args, "OOO", &output_obj, &transport, &typeargs)) {
+  PyObject* ret = NULL;
+
+  if (!PyArg_ParseTuple(args, "OOOOO", &output_obj, &transport, &typeargs, &string_limit_obj, &container_limit_obj)) {
     return NULL;
   }
+  string_limit = as_long_or(string_limit_obj, INT32_MAX);
+  container_limit = as_long_or(container_limit_obj, INT32_MAX);
 
   if (!parse_struct_args(&parsedargs, typeargs)) {
     return NULL;
@@ -1177,14 +1252,9 @@ decode_binary(PyObject *self, PyObject *args) {
     return NULL;
   }
 
-  if (!decode_struct(&input, output_obj, parsedargs.spec)) {
-    free_decodebuf(&input);
-    return NULL;
-  }
-
+  ret = decode_struct(&input, output_obj, parsedargs.klass, parsedargs.spec, string_limit, container_limit);
   free_decodebuf(&input);
-
-  Py_RETURN_NONE;
+  return  ret;
 }
 
 /* ====== END READING FUNCTIONS ====== */

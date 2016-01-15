@@ -65,6 +65,11 @@ public abstract class ServerTestBase extends TestCase {
       System.out.print("testString(\"" + thing + "\")\n");
       return thing;
     }
+
+    public boolean testBool(boolean thing) {
+      System.out.print("testBool(" + thing + ")\n");
+      return thing;
+    }
   
     public byte testByte(byte thing) {
       System.out.print("testByte(" + thing + ")\n");
@@ -188,31 +193,11 @@ public abstract class ServerTestBase extends TestCase {
     public Map<Long, Map<Numberz,Insanity>> testInsanity(Insanity argument) {
       System.out.print("testInsanity()\n");
   
-      Xtruct hello = new Xtruct();
-      hello.string_thing = "Hello2";
-      hello.byte_thing = 2;
-      hello.i32_thing = 2;
-      hello.i64_thing = 2;
-  
-      Xtruct goodbye = new Xtruct();
-      goodbye.string_thing = "Goodbye4";
-      goodbye.byte_thing = (byte)4;
-      goodbye.i32_thing = 4;
-      goodbye.i64_thing = (long)4;
-  
-      Insanity crazy = new Insanity();
-      crazy.userMap = new HashMap<Numberz, Long>();
-      crazy.userMap.put(Numberz.EIGHT, (long)8);
-      crazy.userMap.put(Numberz.FIVE, (long)5);
-      crazy.xtructs = new ArrayList<Xtruct>();
-      crazy.xtructs.add(goodbye);
-      crazy.xtructs.add(hello);
-  
       HashMap<Numberz,Insanity> first_map = new HashMap<Numberz, Insanity>();
       HashMap<Numberz,Insanity> second_map = new HashMap<Numberz, Insanity>();;
   
-      first_map.put(Numberz.TWO, crazy);
-      first_map.put(Numberz.THREE, crazy);
+      first_map.put(Numberz.TWO, argument);
+      first_map.put(Numberz.THREE, argument);
   
       Insanity looney = new Insanity();
       second_map.put(Numberz.SIX, looney);
@@ -304,6 +289,13 @@ public abstract class ServerTestBase extends TestCase {
   public abstract void stopServer() throws Exception;
 
   public abstract TTransport getClientTransport(TTransport underlyingTransport) throws Exception;
+
+  private void testBool(ThriftTest.Client testClient) throws TException {
+    boolean t = testClient.testBool(true);
+    assertEquals(true, t);
+    boolean f = testClient.testBool(false);
+    assertEquals(false, f);
+  }
 
   private void testByte(ThriftTest.Client testClient) throws TException {
     byte i8 = testClient.testByte((byte)1);
@@ -404,6 +396,7 @@ public abstract class ServerTestBase extends TestCase {
       open(transport);
       testVoid(testClient);
       testString(testClient);
+      testBool(testClient);
       testByte(testClient);
       testI32(testClient);
       testI64(testClient);
@@ -582,6 +575,11 @@ public abstract class ServerTestBase extends TestCase {
         @Override
         public void testString(String thing, AsyncMethodCallback resultHandler) throws TException {
             resultHandler.onComplete(handler.testString(thing));
+        }
+
+        @Override
+        public void testBool(boolean thing, AsyncMethodCallback resultHandler) throws TException {
+            resultHandler.onComplete(handler.testBool(thing));
         }
 
         @Override

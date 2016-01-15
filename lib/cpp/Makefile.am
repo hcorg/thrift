@@ -57,22 +57,25 @@ pkgconfig_DATA += thrift-qt5.pc
 endif
 
 AM_CXXFLAGS = -Wall -Wextra -pedantic
-AM_CPPFLAGS = $(BOOST_CPPFLAGS) $(OPENSSL_INCLUDES) -I$(srcdir)/src
+AM_CPPFLAGS = $(BOOST_CPPFLAGS) $(OPENSSL_INCLUDES) -I$(srcdir)/src -D__STDC_LIMIT_MACROS
 AM_LDFLAGS = $(BOOST_LDFLAGS) $(OPENSSL_LDFLAGS)
 
 # Define the source files for the module
 
-libthrift_la_SOURCES = src/thrift/Thrift.cpp \
-                       src/thrift/TApplicationException.cpp \
+libthrift_la_SOURCES = src/thrift/TApplicationException.cpp \
+                       src/thrift/TOutput.cpp \
                        src/thrift/VirtualProfiling.cpp \
+                       src/thrift/async/TAsyncChannel.cpp \
+                       src/thrift/async/TConcurrentClientSyncInfo.cpp \
                        src/thrift/concurrency/ThreadManager.cpp \
                        src/thrift/concurrency/TimerManager.cpp \
                        src/thrift/concurrency/Util.cpp \
+                       src/thrift/processor/PeekProcessor.cpp \
                        src/thrift/protocol/TDebugProtocol.cpp \
-                       src/thrift/protocol/TDenseProtocol.cpp \
                        src/thrift/protocol/TJSONProtocol.cpp \
                        src/thrift/protocol/TBase64Utils.cpp \
                        src/thrift/protocol/TMultiplexedProtocol.cpp \
+                       src/thrift/protocol/TProtocol.cpp \
                        src/thrift/transport/TTransportException.cpp \
                        src/thrift/transport/TFDTransport.cpp \
                        src/thrift/transport/TFileTransport.cpp \
@@ -89,12 +92,12 @@ libthrift_la_SOURCES = src/thrift/Thrift.cpp \
                        src/thrift/transport/TSSLServerSocket.cpp \
                        src/thrift/transport/TTransportUtils.cpp \
                        src/thrift/transport/TBufferTransports.cpp \
+                       src/thrift/server/TConnectedClient.cpp \
                        src/thrift/server/TServer.cpp \
+                       src/thrift/server/TServerFramework.cpp \
                        src/thrift/server/TSimpleServer.cpp \
                        src/thrift/server/TThreadPoolServer.cpp \
-                       src/thrift/server/TThreadedServer.cpp \
-                       src/thrift/async/TAsyncChannel.cpp \
-                       src/thrift/processor/PeekProcessor.cpp
+                       src/thrift/server/TThreadedServer.cpp
 
 if WITH_BOOSTTHREADS
 libthrift_la_SOURCES += src/thrift/concurrency/BoostThreadFactory.cpp \
@@ -111,7 +114,10 @@ libthriftnb_la_SOURCES = src/thrift/server/TNonblockingServer.cpp \
                          src/thrift/async/TEvhttpServer.cpp \
                          src/thrift/async/TEvhttpClientChannel.cpp
 
-libthriftz_la_SOURCES = src/thrift/transport/TZlibTransport.cpp
+libthriftz_la_SOURCES = src/thrift/transport/TZlibTransport.cpp \
+                        src/thrift/transport/THeaderTransport.cpp \
+                        src/thrift/protocol/THeaderProtocol.cpp 
+
 
 libthriftqt_la_MOC = src/thrift/qt/moc_TQTcpServer.cpp
 nodist_libthriftqt_la_SOURCES = $(libthriftqt_la_MOC)
@@ -148,12 +154,13 @@ include_thrift_HEADERS = \
                          src/thrift/thrift-config.h \
                          src/thrift/TDispatchProcessor.h \
                          src/thrift/Thrift.h \
-                         src/thrift/TReflectionLocal.h \
+                         src/thrift/TOutput.h \
                          src/thrift/TProcessor.h \
                          src/thrift/TApplicationException.h \
                          src/thrift/TLogging.h \
                          src/thrift/cxxfunctional.h \
-                         src/thrift/TToString.h
+                         src/thrift/TToString.h \
+                         src/thrift/TBase.h
 
 include_concurrencydir = $(include_thriftdir)/concurrency
 include_concurrency_HEADERS = \
@@ -179,13 +186,14 @@ include_protocol_HEADERS = \
                          src/thrift/protocol/TBinaryProtocol.tcc \
                          src/thrift/protocol/TCompactProtocol.h \
                          src/thrift/protocol/TCompactProtocol.tcc \
-                         src/thrift/protocol/TDenseProtocol.h \
                          src/thrift/protocol/TDebugProtocol.h \
+                         src/thrift/protocol/THeaderProtocol.h \
                          src/thrift/protocol/TBase64Utils.h \
                          src/thrift/protocol/TJSONProtocol.h \
                          src/thrift/protocol/TMultiplexedProtocol.h \
                          src/thrift/protocol/TProtocolDecorator.h \
                          src/thrift/protocol/TProtocolTap.h \
+                         src/thrift/protocol/TProtocolTypes.h \
                          src/thrift/protocol/TProtocolException.h \
                          src/thrift/protocol/TVirtualProtocol.h \
                          src/thrift/protocol/TProtocol.h
@@ -195,6 +203,7 @@ include_transport_HEADERS = \
                          src/thrift/transport/PlatformSocket.h \
                          src/thrift/transport/TFDTransport.h \
                          src/thrift/transport/TFileTransport.h \
+                         src/thrift/transport/THeaderTransport.h \
                          src/thrift/transport/TSimpleFileTransport.h \
                          src/thrift/transport/TServerSocket.h \
                          src/thrift/transport/TSSLServerSocket.h \
@@ -217,7 +226,9 @@ include_transport_HEADERS = \
 
 include_serverdir = $(include_thriftdir)/server
 include_server_HEADERS = \
+                         src/thrift/server/TConnectedClient.h \
                          src/thrift/server/TServer.h \
+                         src/thrift/server/TServerFramework.h \
                          src/thrift/server/TSimpleServer.h \
                          src/thrift/server/TThreadPoolServer.h \
                          src/thrift/server/TThreadedServer.h \
@@ -236,6 +247,7 @@ include_async_HEADERS = \
                      src/thrift/async/TAsyncProcessor.h \
                      src/thrift/async/TAsyncBufferProcessor.h \
                      src/thrift/async/TAsyncProtocolProcessor.h \
+                     src/thrift/async/TConcurrentClientSyncInfo.h \
                      src/thrift/async/TEvhttpClientChannel.h \
                      src/thrift/async/TEvhttpServer.h
 
@@ -256,12 +268,15 @@ WINDOWS_DIST = \
              3rdparty.props
 
 EXTRA_DIST = \
+             CMakeLists.txt \
+             coding_standards.md \
              README.md \
              thrift-nb.pc.in \
              thrift.pc.in \
              thrift-z.pc.in \
              thrift-qt.pc.in \
              thrift-qt5.pc.in \
+             src/thrift/qt/CMakeLists.txt \
              $(WINDOWS_DIST)
 
 style-local:

@@ -522,7 +522,7 @@ void testEventSequencing() {
   // can test the timing for the preRead() call.
   string requestName = "getDataWait";
   string eventName = "ParentService.getDataWait";
-  int32_t seqid = time(NULL);
+  int32_t seqid = int32_t(time(NULL));
   TBinaryProtocol protocol(socket);
   protocol.writeMessageBegin(requestName, T_CALL, seqid);
   socket->flush();
@@ -765,6 +765,9 @@ void testExpectedError() {
     BOOST_FAIL("expected MyError to be thrown");
   } catch (const MyError& e) {
     BOOST_CHECK_EQUAL(message, e.message);
+    // Check if std::exception::what() is handled properly
+    size_t message_pos = std::string(e.what()).find("TException - service has thrown: MyError");
+    BOOST_CHECK_NE(message_pos, std::string::npos);
   }
 
   // Now we should see the events for a normal call finish
@@ -816,7 +819,7 @@ void testUnexpectedError() {
   try {
     client->recv_unexpectedExceptionWait();
     BOOST_FAIL("expected TApplicationError to be thrown");
-  } catch (const TApplicationException& e) {
+  } catch (const TApplicationException&) {
   }
 
   // Now we should see a handler error event
@@ -905,9 +908,20 @@ DEFINE_NOFRAME_TESTS(TSimpleServer, Untemplated)
 
 // TODO: We should test TEventServer in the future.
 // For now, it is known not to work correctly with TProcessorEventHandler.
+#ifdef BOOST_TEST_DYN_LINK
+bool init_unit_test_suite() {
+  unit_test::framework::master_test_suite().p_name.value = "ProcessorTest";
+  return true;
+}
+
+int main( int argc, char* argv[] ) {
+  return ::boost::unit_test::unit_test_main(&init_unit_test_suite,argc,argv);
+}
+#else
 unit_test::test_suite* init_unit_test_suite(int argc, char* argv[]) {
   THRIFT_UNUSED_VARIABLE(argc);
   THRIFT_UNUSED_VARIABLE(argv);
   unit_test::framework::master_test_suite().p_name.value = "ProcessorTest";
   return NULL;
 }
+#endif

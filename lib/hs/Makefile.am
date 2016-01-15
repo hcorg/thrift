@@ -18,6 +18,7 @@
 #
 
 EXTRA_DIST = \
+	coding_standards.md \
 	LICENSE \
 	README.md \
 	Setup.lhs \
@@ -41,3 +42,7 @@ maintainer-clean-local:
 
 check-local:
 	$(CABAL) check
+	$(CABAL) install --only-dependencies --enable-tests
+	$(CABAL) configure --enable-tests
+	$(CABAL) build
+	$(CABAL) test

@@ -37,7 +37,7 @@ public:
     TYPE_VOID,
     TYPE_STRING,
     TYPE_BOOL,
-    TYPE_BYTE,
+    TYPE_I8,
     TYPE_I16,
     TYPE_I32,
     TYPE_I64,
@@ -49,7 +49,7 @@ public:
   static t_base_type* type_binary;
   static t_base_type* type_slist;
   static t_base_type* type_bool;
-  static t_base_type* type_byte;
+  static t_base_type* type_i8;
   static t_base_type* type_i16;
   static t_base_type* type_i32;
   static t_base_type* type_i64;
@@ -84,14 +84,6 @@ public:
 
   bool is_base_type() const { return true; }
 
-  virtual std::string get_fingerprint_material() const {
-    std::string rv = t_base_name(base_);
-    if (rv == "(unknown)") {
-      throw "BUG: Can't get fingerprint material for this base type.";
-    }
-    return rv;
-  }
-
   static std::string t_base_name(t_base tbase) {
     switch (tbase) {
     case TYPE_VOID:
@@ -103,8 +95,8 @@ public:
     case TYPE_BOOL:
       return "bool";
       break;
-    case TYPE_BYTE:
-      return "byte";
+    case TYPE_I8:
+      return "i8";
       break;
     case TYPE_I16:
       return "i16";

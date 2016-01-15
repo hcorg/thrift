@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# encoding: utf-8
 
 #
 # Licensed to the Apache Software Foundation (ASF) under one
@@ -45,19 +46,16 @@ ARGV.each do|a|
   elsif a.start_with?("--transport")
     $transport = a.split("=")[1]
   elsif a.start_with?("--port")
-    $port = a.split("=")[1].to_i 
+    $port = a.split("=")[1].to_i
   end
 end
 ARGV=[]
 
 class SimpleClientTest < Test::Unit::TestCase
-  def setup 
+  def setup
     unless @socket
       @socket   = Thrift::Socket.new($host, $port)
-      transportFactory = Thrift::BufferedTransport.new(@socket)
       if $transport == "buffered"
-        transportFactory = Thrift::BufferedTransport.new(@socket)
-      elsif $transport == ""
         transportFactory = Thrift::BufferedTransport.new(@socket)
       elsif $transport == "framed"
         transportFactory = Thrift::FramedTransport.new(@socket)
@@ -66,8 +64,6 @@ class SimpleClientTest < Test::Unit::TestCase
       end
 
       if $protocolType == "binary"
-        @protocol = Thrift::BinaryProtocol.new(transportFactory)
-      elsif $protocolType == ""
         @protocol = Thrift::BinaryProtocol.new(transportFactory)
       elsif $protocolType == "compact"
         @protocol = Thrift::CompactProtocol.new(transportFactory)
@@ -82,55 +78,121 @@ class SimpleClientTest < Test::Unit::TestCase
       @socket.open
     end
   end
-  
+
+  def teardown
+    @socket.close
+  end
+
   def test_void
+    p 'test_void'
     @client.testVoid()
   end
 
   def test_string
-    assert_equal(@client.testString('string'), 'string')
+    p 'test_string'
+    test_string =
+      'quote: \" backslash:' +
+      ' forwardslash-escaped: \/ ' +
+      ' backspace: \b formfeed: \f newline: \n return: \r tab: ' +
+      ' now-all-of-them-together: "\\\/\b\n\r\t' +
+      ' now-a-bunch-of-junk: !@#$%&()(&%$#{}{}<><><' +
+      ' char-to-test-json-parsing: ]] \"]] \\" }}}{ [[[ '
+    test_string = "Afrikaans, Alemannisch, Aragonés, العربية, مصرى, " +
+      "Asturianu, Aymar aru, Azərbaycan, Башҡорт, Boarisch, Žemaitėška, " +
+      "Беларуская, Беларуская (тарашкевіца), Български, Bamanankan, " +
+      "বাংলা, Brezhoneg, Bosanski, Català, Mìng-dĕ̤ng-ngṳ̄, Нохчийн, " +
+      "Cebuano, ᏣᎳᎩ, Česky, Словѣ́ньскъ / ⰔⰎⰑⰂⰡⰐⰠⰔⰍⰟ, Чӑвашла, Cymraeg, " +
+      "Dansk, Zazaki, ދިވެހިބަސް, Ελληνικά, Emiliàn e rumagnòl, English, " +
+      "Esperanto, Español, Eesti, Euskara, فارسی, Suomi, Võro, Føroyskt, " +
+      "Français, Arpetan, Furlan, Frysk, Gaeilge, 贛語, Gàidhlig, Galego, " +
+      "Avañe'ẽ, ગુજરાતી, Gaelg, עברית, हिन्दी, Fiji Hindi, Hrvatski, " +
+      "Kreyòl ayisyen, Magyar, Հայերեն, Interlingua, Bahasa Indonesia, " +
+      "Ilokano, Ido, Íslenska, Italiano, 日本語, Lojban, Basa Jawa, " +
+      "ქართული, Kongo, Kalaallisut, ಕನ್ನಡ, 한국어, Къарачай-Малкъар, " +
+      "Ripoarisch, Kurdî, Коми, Kernewek, Кыргызча, Latina, Ladino, " +
+      "Lëtzebuergesch, Limburgs, Lingála, ລາວ, Lietuvių, Latviešu, Basa " +
+      "Banyumasan, Malagasy, Македонски, മലയാളം, मराठी, مازِرونی, Bahasa " +
+      "Melayu, Nnapulitano, Nedersaksisch, नेपाल भाषा, Nederlands, ‪" +
+      "Norsk (nynorsk)‬, ‪Norsk (bokmål)‬, Nouormand, Diné bizaad, " +
+      "Occitan, Иронау, Papiamentu, Deitsch, Polski, پنجابی, پښتو, " +
+      "Norfuk / Pitkern, Português, Runa Simi, Rumantsch, Romani, Română, " +
+      "Русский, Саха тыла, Sardu, Sicilianu, Scots, Sámegiella, Simple " +
+      "English, Slovenčina, Slovenščina, Српски / Srpski, Seeltersk, " +
+      "Svenska, Kiswahili, தமிழ், తెలుగు, Тоҷикӣ, ไทย, Türkmençe, Tagalog, " +
+      "Türkçe, Татарча/Tatarça, Українська, اردو, Tiếng Việt, Volapük, " +
+      "Walon, Winaray, 吴语, isiXhosa, ייִדיש, Yorùbá, Zeêuws, 中文, " +
+      "Bân-lâm-gú, 粵語"
+
+    result_string = @client.testString(test_string)
+    assert_equal(test_string, result_string.force_encoding(Encoding::UTF_8))
+  end
+
+  def test_bool
+    p 'test_bool'
+    assert_equal(@client.testBool(true), true)
+    assert_equal(@client.testBool(false), false)
   end
 
   def test_byte
-    val = 8
+    p 'test_byte'
+    val = 120
     assert_equal(@client.testByte(val), val)
     assert_equal(@client.testByte(-val), -val)
   end
 
   def test_i32
-    val = 32
+    p 'test_i32'
+    val = 2000000032
     assert_equal(@client.testI32(val), val)
     assert_equal(@client.testI32(-val), -val)
   end
 
   def test_i64
-    val = 64
+    p 'test_i64'
+    val = 9000000000000000064
     assert_equal(@client.testI64(val), val)
     assert_equal(@client.testI64(-val), -val)
   end
 
   def test_double
-    val = 3.14
+    p 'test_double'
+    val = 3.14159265358979323846
     assert_equal(@client.testDouble(val), val)
     assert_equal(@client.testDouble(-val), -val)
     assert_kind_of(Float, @client.testDouble(val))
   end
 
-  # TODO: testBinary
-  
+  def test_binary
+    p 'test_binary'
+    val = (0...256).reverse_each.to_a
+    ret = @client.testBinary(val.pack('C*'))
+    assert_equal(val, ret.bytes.to_a)
+  end
+
   def test_map
+    p 'test_map'
     val = {1 => 1, 2 => 2, 3 => 3}
     assert_equal(@client.testMap(val), val)
     assert_kind_of(Hash, @client.testMap(val))
   end
 
+  def test_string_map
+    p 'test_string_map'
+    val = {'a' => '2', 'b' => 'blah', 'some' => 'thing'}
+    ret = @client.testStringMap(val)
+    assert_equal(val, ret)
+    assert_kind_of(Hash, ret)
+  end
+
   def test_list
+    p 'test_list'
     val = [1,2,3,4,5]
     assert_equal(@client.testList(val), val)
     assert_kind_of(Array, @client.testList(val))
   end
 
   def test_enum
+    p 'test_enum'
     val = Thrift::Test::Numberz::SIX
     ret = @client.testEnum(val)
 
@@ -139,6 +201,7 @@ class SimpleClientTest < Test::Unit::TestCase
   end
 
   def test_typedef
+    p 'test_typedef'
     #UserId  testTypedef(1: UserId thing),
     assert_equal(@client.testTypedef(309858235082523), 309858235082523)
     assert_kind_of(Fixnum, @client.testTypedef(309858235082523))
@@ -146,6 +209,7 @@ class SimpleClientTest < Test::Unit::TestCase
   end
 
   def test_set
+    p 'test_set'
     val = Set.new([1,2,3])
     assert_equal(@client.testSet(val), val)
     assert_kind_of(Set, @client.testSet(val))
@@ -156,22 +220,28 @@ class SimpleClientTest < Test::Unit::TestCase
   end
 
   def test_struct
+    p 'test_struct'
     ret = @client.testStruct(get_struct)
 
-    assert_nil(ret.byte_thing, nil)
-    assert_nil(ret.i64_thing, nil)
+    # TODO: not sure what unspecified "default" requiredness values should be
+    assert(ret.byte_thing == nil || ret.byte_thing == 0)
+    assert(ret.i64_thing == nil || ret.i64_thing == 0)
+
     assert_equal(ret.string_thing, 'hi!')
     assert_equal(ret.i32_thing, 4)
     assert_kind_of(Thrift::Test::Xtruct, ret)
   end
 
   def test_nest
+    p 'test_nest'
     struct2 = Thrift::Test::Xtruct2.new({'struct_thing' => get_struct, 'i32_thing' => 10})
 
     ret = @client.testNest(struct2)
 
-    assert_nil(ret.struct_thing.byte_thing, nil)
-    assert_nil(ret.struct_thing.i64_thing, nil)
+    # TODO: not sure what unspecified "default" requiredness values should be
+    assert(ret.struct_thing.byte_thing == nil || ret.struct_thing.byte_thing == 0)
+    assert(ret.struct_thing.i64_thing == nil || ret.struct_thing.i64_thing == 0)
+
     assert_equal(ret.struct_thing.string_thing, 'hi!')
     assert_equal(ret.struct_thing.i32_thing, 4)
     assert_equal(ret.i32_thing, 10)
@@ -181,49 +251,87 @@ class SimpleClientTest < Test::Unit::TestCase
   end
 
   def test_insanity
+    p 'test_insanity'
     insane = Thrift::Test::Insanity.new({
-      'userMap' => { Thrift::Test::Numberz::ONE => 44 },
-      'xtructs' => [get_struct,
+      'userMap' => {
+        Thrift::Test::Numberz::FIVE => 5,
+        Thrift::Test::Numberz::EIGHT => 8,
+      },
+      'xtructs' => [
         Thrift::Test::Xtruct.new({
-          'string_thing' => 'hi again',
-          'i32_thing' => 12
+          'string_thing' => 'Goodbye4',
+          'byte_thing' => 4,
+          'i32_thing' => 4,
+          'i64_thing' => 4,
+        }),
+        Thrift::Test::Xtruct.new({
+          'string_thing' => 'Hello2',
+          'byte_thing' => 2,
+          'i32_thing' => 2,
+          'i64_thing' => 2,
         })
       ]
     })
 
     ret = @client.testInsanity(insane)
 
-    assert_not_nil(ret[44])
-    assert_not_nil(ret[44][1])
+    assert_equal(insane, ret[1][2])
+    assert_equal(insane, ret[1][3])
 
-    struct = ret[44][1]
-
-    assert_equal(struct.userMap[Thrift::Test::Numberz::ONE], 44)
-    assert_equal(struct.xtructs[1].string_thing, 'hi again')
-    assert_equal(struct.xtructs[1].i32_thing, 12)
-
-    assert_kind_of(Hash, struct.userMap)
-    assert_kind_of(Array, struct.xtructs)
-    assert_kind_of(Thrift::Test::Insanity, struct)
+    assert(ret[2][6].userMap == nil || ret[2][6].userMap.length == 0)
+    assert(ret[2][6].xtructs == nil || ret[2][6].xtructs.length == 0)
   end
 
   def test_map_map
+    p 'test_map_map'
     ret = @client.testMapMap(4)
     assert_kind_of(Hash, ret)
-    assert_equal(ret, { 4 => { 4 => 4}})
+    expected = {
+      -4 => {
+        -4 => -4,
+        -3 => -3,
+        -2 => -2,
+        -1 => -1,
+      },
+      4 => {
+        4 => 4,
+        3 => 3,
+        2 => 2,
+        1 => 1,
+      }
+    }
+    assert_equal(expected, ret)
+  end
+
+  def test_multi
+    p 'test_multi'
+    ret = @client.testMulti(42, 4242, 424242, {1 => 'blah', 2 => 'thing'}, Thrift::Test::Numberz::EIGHT, 24)
+    expected = Thrift::Test::Xtruct.new({
+      :string_thing => 'Hello2',
+      :byte_thing =>   42,
+      :i32_thing =>    4242,
+      :i64_thing =>    424242
+    })
+    assert_equal(expected, ret)
   end
 
   def test_exception
+    p 'test_exception'
     assert_raise Thrift::Test::Xception do
       @client.testException('Xception')
     end
-#    assert_raise Thrift::TException do
-#      @client.testException('TException')
-#    end
-    assert_equal( @client.testException('test'), "test")
+    begin
+      @client.testException('TException')
+    rescue => e
+      assert e.class.ancestors.include?(Thrift::Exception)
+    end
+    assert_nothing_raised do
+      @client.testException('test')
+    end
   end
 
   def test_multi_exception
+    p 'test_multi_exception'
     assert_raise Thrift::Test::Xception do
       @client.testMultiException("Xception", "test 1")
     end
@@ -234,10 +342,11 @@ class SimpleClientTest < Test::Unit::TestCase
   end
 
   def test_oneway
+    p 'test_oneway'
     time1 = Time.now.to_f
-    @client.testOneway(3)
+    @client.testOneway(1)
     time2 = Time.now.to_f
-    assert_equal((time2-time1)*1000000<400, true)
+    assert_operator (time2-time1), :<, 0.1
   end
 
 end

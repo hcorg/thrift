@@ -17,7 +17,8 @@
 # under the License.
 #
 
-SUBDIRS =
+SUBDIRS = json xml 
+PRECROSS_TARGET =
 
 if WITH_CPP
 SUBDIRS += cpp
@@ -33,10 +34,12 @@ endif
 
 if WITH_MONO
 SUBDIRS += csharp
+PRECROSS_TARGET += precross-csharp
 endif
 
 if WITH_JAVA
 SUBDIRS += java
+PRECROSS_TARGET += precross-java
 # JavaScript unit test depends on java
 # so test only if java, ant & co is available
 SUBDIRS += js/test
@@ -66,6 +69,10 @@ if WITH_PHP
 SUBDIRS += php
 endif
 
+if WITH_DART
+SUBDIRS += dart
+endif
+
 if WITH_GO
 SUBDIRS += go
 endif
@@ -76,6 +83,7 @@ endif
 
 if WITH_NODEJS
 SUBDIRS += nodejs
+PRECROSS_TARGET += precross-nodejs
 endif
 
 if WITH_LUA
@@ -88,6 +96,7 @@ EXTRA_DIST = \
 	as3 \
 	cocoa \
 	d \
+	dart \
 	delphi \
 	haxe \
 	javame \
@@ -95,3 +104,7 @@ EXTRA_DIST = \
 	ocaml \
 	st \
 	ts
+
+precross-%:
+	$(MAKE) -C $* precross
+precross: $(PRECROSS_TARGET)

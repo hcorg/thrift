@@ -20,6 +20,7 @@
 package common
 
 import (
+	"compress/zlib"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -43,6 +44,7 @@ func StartServer(
 	transport string,
 	protocol string,
 	ssl bool,
+	certPath string,
 	handler thrifttest.ThriftTest) (srv *thrift.TSimpleServer, err error) {
 
 	hostPort := fmt.Sprintf("%s:%d", host, port)
@@ -98,6 +100,8 @@ func StartServer(
 		transportFactory = thrift.NewTFramedTransportFactory(transportFactory)
 	case "buffered":
 		transportFactory = thrift.NewTBufferedTransportFactory(8192)
+	case "zlib":
+		transportFactory = thrift.NewTZlibTransportFactory(zlib.BestCompression)
 	case "":
 		transportFactory = thrift.NewTTransportFactory()
 	default:

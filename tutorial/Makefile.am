@@ -66,11 +66,19 @@ if WITH_NODEJS
 SUBDIRS += nodejs
 endif
 
+if WITH_DART
+SUBDIRS += dart
+endif
+
 #
 # generate html for ThriftTest.thrift
 #
 all-local:
 	$(top_builddir)/compiler/cpp/thrift --gen html -r $(top_srcdir)/tutorial/tutorial.thrift
+
+clean-local:
+	rm -rf $(top_srcdir)/tutorial/gen-html
+
 endif
 
 # Any folders or files not listed above being added to SUBDIR need to be placed here in

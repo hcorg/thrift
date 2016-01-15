@@ -27,7 +27,7 @@ AM_YFLAGS = -d
 LIBS =
 BUILT_SOURCES = thrifty.cc
 
-noinst_LIBRARIES = libparse.a libparseobjects.a libcompilermd5.a
+noinst_LIBRARIES = libparse.a libparseobjects.a libcompilermd5.a libcompileraudit.a
 
 libparse_a_CPPFLAGS =
 libparse_a_CXXFLAGS = -Wall -Wno-sign-compare -Wno-unused
@@ -41,6 +41,12 @@ libcompilermd5_a_CXXFLAGS = -Wall -Wextra -Wpedantic -Werror
 libcompilermd5_a_SOURCES = \
 	md5.c \
 	md5.h
+
+libcompileraudit_a_CPPFLAGS =
+libcompileraudit_a_CXXFLAGS = -Wall -Wextra -Wpedantic -Werror
+libcompileraudit_a_SOURCES = \
+	audit/t_audit.cpp \
+	audit/t_audit.h
 
 libparseobjects_a_CPPFLAGS = -I$(srcdir)/src
 libparseobjects_a_CXXFLAGS = -Wall -Wextra -Wpedantic -Werror

@@ -421,7 +421,7 @@ t_rb_ofstream& t_rb_generator::render_const_value(t_rb_ofstream& out,
     case t_base_type::TYPE_BOOL:
       out << (value->get_integer() > 0 ? "true" : "false");
       break;
-    case t_base_type::TYPE_BYTE:
+    case t_base_type::TYPE_I8:
     case t_base_type::TYPE_I16:
     case t_base_type::TYPE_I32:
     case t_base_type::TYPE_I64:
@@ -754,11 +754,12 @@ void t_rb_generator::generate_service(t_service* tservice) {
 
   if (tservice->get_extends() != NULL) {
     if (namespaced_) {
-      f_service_ << "require '" << rb_namespace_to_path_prefix(tservice->get_extends()->get_program()->get_namespace("rb")) << underscore(tservice->get_extends()->get_name())
-	         << "'" << endl;
+      f_service_ << "require '" << rb_namespace_to_path_prefix(
+                                       tservice->get_extends()->get_program()->get_namespace("rb"))
+                 << underscore(tservice->get_extends()->get_name()) << "'" << endl;
     } else {
-      f_service_ << "require '" << require_prefix_ << underscore(tservice->get_extends()->get_name())
-	         << "'" << endl;
+      f_service_ << "require '" << require_prefix_
+                 << underscore(tservice->get_extends()->get_name()) << "'" << endl;
     }
   }
 
@@ -1124,7 +1125,7 @@ string t_rb_generator::type_to_enum(t_type* type) {
       return "::Thrift::Types::STRING";
     case t_base_type::TYPE_BOOL:
       return "::Thrift::Types::BOOL";
-    case t_base_type::TYPE_BYTE:
+    case t_base_type::TYPE_I8:
       return "::Thrift::Types::BYTE";
     case t_base_type::TYPE_I16:
       return "::Thrift::Types::I16";

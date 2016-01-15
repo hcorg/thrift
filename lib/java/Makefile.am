@@ -19,6 +19,8 @@
 
 export CLASSPATH
 
+THRIFT = $(top_builddir)/compiler/cpp/thrift
+
 all-local:
 	$(ANT) $(ANT_FLAGS)
 
@@ -31,12 +33,17 @@ clean-local:
 	ANT=$(ANT) ; if test -z "$$ANT" ; then ANT=: ; fi ; \
 	$$ANT $(ANT_FLAGS) clean
 
+precross: $(THRIFT)
+	$(ANT) $(ANT_FLAGS) compile-test
+
 check-local: all
 	$(ANT) $(ANT_FLAGS) test
 
 EXTRA_DIST = \
 	build.xml \
 	build.properties \
+	CMakeLists.txt \
+	coding_standards.md \
 	src \
 	test \
 	README.md

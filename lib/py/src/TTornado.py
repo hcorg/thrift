@@ -20,11 +20,10 @@
 from __future__ import absolute_import
 import socket
 import struct
-
 import logging
 logger = logging.getLogger(__name__)
 
-from thrift.transport.TTransport import TTransportException, TTransportBase, TMemoryBuffer
+from .transport.TTransport import TTransportException, TTransportBase, TMemoryBuffer
 
 from io import BytesIO
 from collections import deque
@@ -171,7 +170,13 @@ class TTornadoServer(tcpserver.TCPServer):
 
         try:
             while not trans.stream.closed():
-                frame = yield trans.readFrame()
+                try:
+                    frame = yield trans.readFrame()
+                except TTransportException as e:
+                    if e.type == TTransportException.END_OF_FILE:
+                        break
+                    else:
+                        raise
                 tr = TMemoryBuffer(frame)
                 iprot = self._iprot_factory.getProtocol(tr)
                 yield self._processor.process(iprot, oprot)

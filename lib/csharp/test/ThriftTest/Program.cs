@@ -31,12 +31,21 @@ namespace Test
 {
     class Program
     {
-        static void Main(string[] args)
+        static int Main(string[] args)
         {
             if (args.Length == 0)
             {
                 Console.WriteLine("must provide 'server' or 'client' arg");
-                return;
+                return -1;
+            }
+
+            try
+            {
+                Console.SetBufferSize(Console.BufferWidth, 4096);
+            }
+            catch (Exception)
+            {
+                Console.WriteLine("Failed to grow scroll-back buffer");
             }
 
             string[] subArgs = new string[args.Length - 1];
@@ -46,16 +55,17 @@ namespace Test
             }
             if (args[0] == "client")
             {
-                TestClient.Execute(subArgs);
+                return TestClient.Execute(subArgs);
             }
             else if (args[0] == "server")
             {
-                TestServer.Execute(subArgs);
+                return TestServer.Execute(subArgs) ? 0 : 1;
             }
             else
             {
                 Console.WriteLine("first argument must be 'server' or 'client'");
             }
+            return 0;
         }
     }
 }

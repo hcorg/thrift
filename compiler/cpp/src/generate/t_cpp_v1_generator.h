@@ -36,7 +36,6 @@ public:
   void close_generator();
 
   void generate_consts(std::vector<t_const*> consts);
-
   void generate_typedef(t_typedef* ttypedef);
   void generate_enum(t_enum* tenum);
   void generate_forward_declaration(t_struct* tstruct);
@@ -58,19 +57,27 @@ public:
                                    bool pointers = false,
                                    bool read = true,
                                    bool write = true,
-                                   bool swap = false);
+                                   bool swap = false,
+                                   bool is_user_struct = false);
   void generate_struct_definition(std::ofstream& out,
                                   std::ofstream& force_cpp_out,
                                   t_struct* tstruct,
                                   bool setters = true);
   void generate_copy_constructor(std::ofstream& out, t_struct* tstruct, bool is_exception);
+  void generate_move_constructor(std::ofstream& out, t_struct* tstruct, bool is_exception);
+  void generate_constructor_helper(std::ofstream& out,
+                                   t_struct* tstruct,
+                                   bool is_excpetion,
+                                   bool is_move);
   void generate_assignment_operator(std::ofstream& out, t_struct* tstruct);
-  void generate_struct_fingerprint(std::ofstream& out, t_struct* tstruct, bool is_definition);
+  void generate_move_assignment_operator(std::ofstream& out, t_struct* tstruct);
+  void generate_assignment_helper(std::ofstream& out, t_struct* tstruct, bool is_move);
   void generate_struct_reader(std::ofstream& out, t_struct* tstruct, bool pointers = false);
   void generate_struct_writer(std::ofstream& out, t_struct* tstruct, bool pointers = false);
   void generate_struct_result_writer(std::ofstream& out, t_struct* tstruct, bool pointers = false);
   void generate_struct_swap(std::ofstream& out, t_struct* tstruct);
-  void generate_struct_ostream_operator(std::ofstream& out, t_struct* tstruct);
+  void generate_struct_print_method(std::ofstream& out, t_struct* tstruct);
+  void generate_exception_what_method(std::ofstream& out, t_struct* tstruct);
 
   void generate_service_interface(t_service* tservice, std::string style);
   void generate_service_interface_factory(t_service* tservice, std::string style);
@@ -132,6 +139,7 @@ public:
                               std::string target,
                               std::string iface,
                               std::string arg_prefix);
+
   std::string namespace_prefix(std::string ns);
   std::string namespace_open(std::string ns);
   std::string namespace_close(std::string ns);
@@ -151,7 +159,6 @@ public:
                                      bool name_params = true);
   std::string argument_list(t_struct* tstruct, bool name_params = true, bool start_comma = false);
   std::string type_to_enum(t_type* ttype);
-  std::string local_reflection_name(const char*, t_type* ttype, bool external = false);
 
   void generate_enum_constant_list(std::ofstream& f,
                                    const std::vector<t_enum_value*>& constants,
@@ -159,16 +166,23 @@ public:
                                    const char* suffix,
                                    bool include_values);
 
-  void generate_struct_ostream_operator_decl(std::ofstream& f, t_struct* tstruct);
+  void generate_struct_ostream_operator(std::ofstream& f, t_struct* tstruct);
+  void generate_struct_print_method_decl(std::ofstream& f, t_struct* tstruct);
+  void generate_exception_what_method_decl(std::ofstream& f,
+                                           t_struct* tstruct,
+                                           bool external = false);
 
-  void generate_local_reflection(std::ofstream& out, t_type* ttype, bool is_definition);
-  void generate_local_reflection_pointer(std::ofstream& out, t_type* ttype);
+  bool is_reference(t_field* tfield) { return tfield->get_reference(); }
 
-  bool is_reference(t_field* tfield);
+  bool is_complex_type(t_type* ttype) {
+    ttype = get_true_type(ttype);
 
-  bool is_complex_type(t_type* ttype);
+    return ttype->is_container() || ttype->is_struct() || ttype->is_xception()
+           || (ttype->is_base_type()
+               && (((t_base_type*)ttype)->get_base() == t_base_type::TYPE_STRING));
+  }
 
-  void set_use_include_prefix(bool use_include_prefix);
+  void set_use_include_prefix(bool use_include_prefix) { use_include_prefix_ = use_include_prefix; }
 
 private:
   /**
@@ -183,11 +197,6 @@ private:
   bool gen_pure_enums_;
 
   /**
-   * True if we should generate local reflection metadata for TDenseProtocol.
-   */
-  bool gen_dense_;
-
-  /**
    * True if we should generate templatized reader/writer methods.
    */
   bool gen_templates_;
@@ -197,6 +206,11 @@ private:
    * reader/writer methods.
    */
   bool gen_templates_only_;
+
+  /**
+   * True if we should generate move constructors & assignment operators.
+   */
+  bool gen_moveable_;
 
   /**
    * True iff we should use a path prefix in our #include statements for other
@@ -237,11 +251,6 @@ private:
   std::ofstream f_header_;
   std::ofstream f_service_;
   std::ofstream f_service_tcc_;
-
-  /**
-   * When generating local reflections, make sure we don't generate duplicates.
-   */
-  std::set<std::string> reflected_fingerprints_;
 
   // The ProcessorGenerator is used to generate parts of the code,
   // so it needs access to many of our protected members and methods.

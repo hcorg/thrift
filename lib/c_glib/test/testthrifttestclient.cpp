@@ -59,124 +59,130 @@ class TestHandler : public ThriftTestIf {
   TestHandler() {}
 
   void testVoid() {
-    printf("[C -> C++] testVoid()\n");
+    cout << "[C -> C++] testVoid()" << endl;
   }
 
   void testString(string& out, const string &thing) {
-    printf("[C -> C++] testString(\"%s\")\n", thing.c_str());
+    cout << "[C -> C++] testString(\"" << thing << "\")" << endl;
     out = thing;
   }
 
+  bool testBool(const bool thing) {
+    cout << "[C -> C++] testBool(" << (thing ? "true" : "false") << ")" << endl;
+    return thing;
+  }
   int8_t testByte(const int8_t thing) {
-    printf("[C -> C++] testByte(%d)\n", (int)thing);
+    cout << "[C -> C++] testByte(" << (int)thing << ")" << endl;
     return thing;
   }
   int32_t testI32(const int32_t thing) {
-    printf("[C -> C++] testI32(%d)\n", thing);
+    cout << "[C -> C++] testI32(" << thing << ")" << endl;
     return thing;
   }
 
   int64_t testI64(const int64_t thing) {
-    printf("[C -> C++] testI64(%lld)\n", thing);
+    cout << "[C -> C++] testI64(" << thing << ")" << endl;
     return thing;
   }
 
   double testDouble(const double thing) {
-    printf("[C -> C++] testDouble(%lf)\n", thing);
+    cout.precision(6);
+    cout << "[C -> C++] testDouble(" << fixed << thing << ")" << endl;
     return thing;
   }
 
   void testBinary(string& out, const string &thing) {
-    printf("[C -> C++] testBinary(\"%s\")\n", thing.c_str());
+    cout << "[C -> C++] testBinary(\"" << thing << "\")" << endl;
     out = thing;
   }
 
   void testStruct(Xtruct& out, const Xtruct &thing) {
-    printf("[C -> C++] testStruct({\"%s\", %d, %d, %lld})\n", thing.string_thing.c_str(), (int)thing.byte_thing, thing.i32_thing, thing.i64_thing);
+    cout << "[C -> C++] testStruct({\"" << thing.string_thing << "\", " << (int)thing.byte_thing << ", " << thing.i32_thing << ", " << thing.i64_thing << "})" << endl;
     out = thing;
   }
 
   void testNest(Xtruct2& out, const Xtruct2& nest) {
     const Xtruct &thing = nest.struct_thing;
-    printf("[C -> C++] testNest({%d, {\"%s\", %d, %d, %lld}, %d})\n", (int)nest.byte_thing, thing.string_thing.c_str(), (int)thing.byte_thing, thing.i32_thing, thing.i64_thing, nest.i32_thing);
+    cout << "[C -> C++] testNest({" << (int)nest.byte_thing << ", {\"" << thing.string_thing << "\", " << (int)thing.byte_thing << ", " << thing.i32_thing << ", " << thing.i64_thing << "}, " << nest.i32_thing << "})" << endl;
     out = nest;
   }
 
   void testMap(map<int32_t, int32_t> &out, const map<int32_t, int32_t> &thing) {
-    printf("[C -> C++] testMap({");
+    cout << "[C -> C++] testMap({";
     map<int32_t, int32_t>::const_iterator m_iter;
     bool first = true;
     for (m_iter = thing.begin(); m_iter != thing.end(); ++m_iter) {
       if (first) {
         first = false;
       } else {
-        printf(", ");
+        cout << ", ";
       }
-      printf("%d => %d", m_iter->first, m_iter->second);
+      cout << m_iter->first << " => " << m_iter->second;
     }
-    printf("})\n");
+    cout << "})" << endl;
     out = thing;
   }
 
   void testStringMap(map<std::string, std::string> &out, const map<std::string, std::string> &thing) {
-    printf("[C -> C++] testStringMap({");
+    cout << "[C -> C++] testStringMap({";
     map<std::string, std::string>::const_iterator m_iter;
     bool first = true;
     for (m_iter = thing.begin(); m_iter != thing.end(); ++m_iter) {
       if (first) {
         first = false;
       } else {
-        printf(", ");
+        cout << ", ";
       }
-      printf("\"%s\" => \"%s\"", (m_iter->first).c_str(), (m_iter->second).c_str());
+      cout << "\"" << m_iter->first << "\" => \"" << m_iter->second << "\"";
     }
-    printf("})\n");
+    cout << "})" << endl;
     out = thing;
   }
 
 
   void testSet(set<int32_t> &out, const set<int32_t> &thing) {
-    printf("[C -> C++] testSet({");
+    cout << "[C -> C++] testSet({";
     set<int32_t>::const_iterator s_iter;
     bool first = true;
     for (s_iter = thing.begin(); s_iter != thing.end(); ++s_iter) {
       if (first) {
         first = false;
       } else {
-        printf(", ");
+        cout << ", ";
       }
-      printf("%d", *s_iter);
+      cout << *s_iter;
     }
-    printf("})\n");
+    cout << "})" << endl;
     out = thing;
   }
 
   void testList(vector<int32_t> &out, const vector<int32_t> &thing) {
-    printf("[C -> C++] testList({");
+    cout << "[C -> C++] testList({";
     vector<int32_t>::const_iterator l_iter;
     bool first = true;
     for (l_iter = thing.begin(); l_iter != thing.end(); ++l_iter) {
       if (first) {
         first = false;
-      } else {        printf(", ");
+      } else {
+        cout << ", ";
       }
-      printf("%d", *l_iter);
+      cout << *l_iter;
     }
-    printf("})\n");
+    cout << "})" << endl;
     out = thing;
   }
 
   Numberz::type testEnum(const Numberz::type thing) {
-    printf("[C -> C++] testEnum(%d)\n", thing);
+    cout << "[C -> C++] testEnum(" << thing << ")" << endl;
     return thing;
   }
 
   UserId testTypedef(const UserId thing) {
-    printf("[C -> C++] testTypedef(%lld)\n", thing);
+    cout << "[C -> C++] testTypedef(" << thing << ")" << endl;
     return thing;  }
 
   void testMapMap(map<int32_t, map<int32_t,int32_t> > &mapmap, const int32_t hello) {
-    printf("[C -> C++] testMapMap(%d)\n", hello);
+    cout << "[C -> C++] testMapMap(" << hello << ")" << endl;
 
     map<int32_t,int32_t> pos;
     map<int32_t,int32_t> neg;
@@ -191,7 +197,9 @@ class TestHandler : public ThriftTestIf {
   }
 
   void testInsanity(map<UserId, map<Numberz::type,Insanity> > &insane, const Insanity &argument) {
-    printf("[C -> C++] testInsanity()\n");
+    THRIFT_UNUSED_VARIABLE (argument);
+
+    cout << "[C -> C++] testInsanity()" << endl;
 
     Xtruct hello;
     hello.string_thing = "Hello2";
@@ -224,43 +232,46 @@ class TestHandler : public ThriftTestIf {
     insane.insert(make_pair(1, first_map));
     insane.insert(make_pair(2, second_map));
 
-    printf("return");
-    printf(" = {");
+    cout << "return = {";
     map<UserId, map<Numberz::type,Insanity> >::const_iterator i_iter;
     for (i_iter = insane.begin(); i_iter != insane.end(); ++i_iter) {
-      printf("%lld => {", i_iter->first);
+      cout << i_iter->first << " => {";
       map<Numberz::type,Insanity>::const_iterator i2_iter;
       for (i2_iter = i_iter->second.begin();
            i2_iter != i_iter->second.end();
            ++i2_iter) {
-        printf("%d => {", i2_iter->first);
+        cout << i2_iter->first << " => {";
         map<Numberz::type, UserId> userMap = i2_iter->second.userMap;
         map<Numberz::type, UserId>::const_iterator um;
-        printf("{");
+        cout << "{";
         for (um = userMap.begin(); um != userMap.end(); ++um) {
-          printf("%d => %lld, ", um->first, um->second);
+          cout << um->first << " => " << um->second << ", ";
         }
-        printf("}, ");
+        cout << "}, ";
 
         vector<Xtruct> xtructs = i2_iter->second.xtructs;
         vector<Xtruct>::const_iterator x;
-        printf("{");
+        cout << "{";
         for (x = xtructs.begin(); x != xtructs.end(); ++x) {
-          printf("{\"%s\", %d, %d, %lld}, ", x->string_thing.c_str(), (int)x->byte_thing, x->i32_thing, x->i64_thing);
+          cout << "{\"" << x->string_thing << "\", " << (int)x->byte_thing << ", " << x->i32_thing << ", " << x->i64_thing << "}, ";
         }
-        printf("}");
+        cout << "}";
 
-        printf("}, ");
+        cout << "}, ";
       }
-      printf("}, ");
+      cout << "}, ";
     }
-    printf("}\n");
+    cout << "}" << endl;
 
 
   }
 
   void testMulti(Xtruct &hello, const int8_t arg0, const int32_t arg1, const int64_t arg2, const std::map<int16_t, std::string>  &arg3, const Numberz::type arg4, const UserId arg5) {
-    printf("[C -> C++] testMulti()\n");
+    THRIFT_UNUSED_VARIABLE (arg3);
+    THRIFT_UNUSED_VARIABLE (arg4);
+    THRIFT_UNUSED_VARIABLE (arg5);
+
+    cout << "[C -> C++] testMulti()" << endl;
 
     hello.string_thing = "Hello2";
     hello.byte_thing = arg0;
@@ -271,7 +282,7 @@ class TestHandler : public ThriftTestIf {
   void testException(const std::string &arg)
     throw(Xception, apache::thrift::TException)
   {
-    printf("[C -> C++] testException(%s)\n", arg.c_str());
+    cout << "[C -> C++] testException(" << arg << ")" << endl;
     if (arg.compare("Xception") == 0) {
       Xception e;
       e.errorCode = 1001;
@@ -289,7 +300,7 @@ class TestHandler : public ThriftTestIf {
 
   void testMultiException(Xtruct &result, const std::string &arg0, const std::string &arg1) throw(Xception, Xception2) {
 
-    printf("[C -> C++] testMultiException(%s, %s)\n", arg0.c_str(), arg1.c_str());
+    cout << "[C -> C++] testMultiException(" << arg0 << ", " << arg1 << ")" << endl;
 
     if (arg0.compare("Xception") == 0) {
       Xception e;
@@ -308,14 +319,16 @@ class TestHandler : public ThriftTestIf {
   }
 
   void testOneway(int sleepFor) {
-    printf("testOneway(%d): Sleeping...\n", sleepFor);
+    cout << "testOneway(" << sleepFor << "): Sleeping..." << endl;
     sleep(sleepFor);
-    printf("testOneway(%d): done sleeping!\n", sleepFor);
+    cout << "testOneway(" << sleepFor << "): done sleeping!" << endl;
   }
 };
 
 // C CLIENT
 extern "C" {
+
+#undef THRIFT_SOCKET /* from lib/cpp */
 
 #include "t_test_thrift_test.h"
 #include "t_test_thrift_test_types.h"
@@ -352,8 +365,10 @@ test_thrift_client (void)
   TTestXception *xception = NULL;
   TTestXception2 *xception2 = NULL;
 
+#if (!GLIB_CHECK_VERSION (2, 36, 0))
   // initialize gobject
   g_type_init ();
+#endif
 
   // create a C client
   tsocket = (ThriftSocket *) g_object_new (THRIFT_TYPE_SOCKET, 
@@ -526,8 +541,7 @@ test_thrift_client (void)
   assert (t_test_thrift_test_client_test_exception (iface, "ApplicationException", &xception, &error) == FALSE);
   g_error_free (error);
   error = NULL;
-  g_object_unref (xception);
-  xception = NULL;
+  assert (xception == NULL);
 
   assert (t_test_thrift_test_client_test_exception (iface, "Test", &xception, &error) == TRUE);
   assert (error == NULL);
@@ -579,11 +593,13 @@ test_thrift_client (void)
 static void
 bailout (int signum)
 {
+  THRIFT_UNUSED_VARIABLE (signum);
+
   exit (1);
 }
 
 int
-main (int argc, char **argv)
+main (void)
 {
   int status;
   int pid = fork ();
@@ -591,11 +607,11 @@ main (int argc, char **argv)
 
   if (pid == 0) /* child */
   {
-    shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
-    shared_ptr<TestHandler> testHandler(new TestHandler());
-    shared_ptr<ThriftTestProcessor> testProcessor(new ThriftTestProcessor(testHandler));
-    shared_ptr<TServerSocket> serverSocket(new TServerSocket(TEST_PORT));
-    shared_ptr<TTransportFactory> transportFactory(new TBufferedTransportFactory());
+    boost::shared_ptr<TProtocolFactory> protocolFactory(new TBinaryProtocolFactory());
+    boost::shared_ptr<TestHandler> testHandler(new TestHandler());
+    boost::shared_ptr<ThriftTestProcessor> testProcessor(new ThriftTestProcessor(testHandler));
+    boost::shared_ptr<TServerSocket> serverSocket(new TServerSocket(TEST_PORT));
+    boost::shared_ptr<TTransportFactory> transportFactory(new TBufferedTransportFactory());
     TSimpleServer simpleServer(testProcessor, serverSocket, transportFactory, protocolFactory);
     signal (SIGALRM, bailout);
     alarm (60);
@@ -604,7 +620,7 @@ main (int argc, char **argv)
     sleep (1);
     test_thrift_client ();
     kill (pid, SIGINT);
-    wait (&status) == pid;
+    assert (wait (&status) == pid);
   }
 
   return 0;

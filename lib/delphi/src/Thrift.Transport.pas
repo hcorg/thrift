@@ -19,6 +19,11 @@
 
  {$SCOPEDENUMS ON}
 
+{$IF CompilerVersion < 28.0}
+  {$DEFINE OLD_SOCKETS}   // TODO: add socket support for CompilerVersion >= 28.0
+{$IFEND}
+
+
 unit Thrift.Transport;
 
 interface
@@ -27,7 +32,10 @@ uses
   Classes,
   SysUtils,
   Math,
-  Sockets, WinSock,
+  WinSock,
+  {$IFDEF OLD_SOCKETS}
+  Sockets,
+  {$ENDIF}
   Generics.Collections,
   Thrift.Collections,
   Thrift.Utils,
@@ -151,6 +159,7 @@ type
     function GetTransport( const ATrans: ITransport): ITransport; virtual;
   end;
 
+  {$IFDEF OLD_SOCKETS}
   TTcpSocketStreamImpl = class( TThriftStreamImpl )
   private type
     TWaitForData = ( wfd_HaveData, wfd_Timeout, wfd_Error);
@@ -160,7 +169,7 @@ type
     function Select( ReadReady, WriteReady, ExceptFlag: PBoolean;
                      TimeOut: Integer; var wsaError : Integer): Integer;
     function WaitForData( TimeOut : Integer; pBuf : Pointer; DesiredBytes: Integer;
-                          var wsaError : Integer): TWaitForData;
+                          var wsaError, bytesReady : Integer): TWaitForData;
   protected
     procedure Write( const buffer: TBytes; offset: Integer; count: Integer); override;
     function Read( var buffer: TBytes; offset: Integer; count: Integer): Integer; override;
@@ -173,6 +182,7 @@ type
   public
     constructor Create( const ATcpClient: TCustomIpClient; const aTimeout : Integer = 0);
   end;
+  {$ENDIF}
 
   IStreamTransport = interface( ITransport )
     ['{A8479B47-2A3E-4421-A9A0-D5A9EDCC634A}']
@@ -223,6 +233,7 @@ type
     destructor Destroy; override;
   end;
 
+  {$IFDEF OLD_SOCKETS}
   TServerSocketImpl = class( TServerTransportImpl)
   private
     FServer : TTcpServer;
@@ -239,6 +250,7 @@ type
     procedure Listen; override;
     procedure Close; override;
   end;
+  {$ENDIF}
 
   TBufferedTransportImpl = class( TTransportImpl )
   private
@@ -263,6 +275,7 @@ type
     property IsOpen: Boolean read GetIsOpen;
   end;
 
+  {$IFDEF OLD_SOCKETS}
   TSocketImpl = class(TStreamTransportImpl)
   private
     FClient : TCustomIpClient;
@@ -284,6 +297,7 @@ type
     property Host : string read FHost;
     property Port: Integer read FPort;
   end;
+  {$ENDIF}
 
   TFramedTransportImpl = class( TTransportImpl)
   private const
@@ -531,6 +545,7 @@ end;
 
 { TServerSocket }
 
+{$IFDEF OLD_SOCKETS}
 constructor TServerSocketImpl.Create( const AServer: TTcpServer; AClientTimeout: Integer);
 begin
   inherited Create;
@@ -727,6 +742,7 @@ begin
   FInputStream := TTcpSocketStreamImpl.Create( FClient, FTimeout);
   FOutputStream := FInputStream;
 end;
+{$ENDIF}
 
 { TBufferedStream }
 
@@ -1168,6 +1184,7 @@ end;
 
 { TTcpSocketStreamImpl }
 
+{$IFDEF OLD_SOCKETS}
 procedure TTcpSocketStreamImpl.Close;
 begin
   FTcpClient.Close;
@@ -1277,10 +1294,12 @@ end;
 
 function TTcpSocketStreamImpl.WaitForData( TimeOut : Integer; pBuf : Pointer;
                                            DesiredBytes : Integer;
-                                           var wsaError : Integer): TWaitForData;
+                                           var wsaError, bytesReady : Integer): TWaitForData;
 var bCanRead, bError : Boolean;
     retval : Integer;
 begin
+  bytesReady := 0;
+
   // The select function returns the total number of socket handles that are ready
   // and contained in the fd_set structures, zero if the time limit expired,
   // or SOCKET_ERROR if an error occurred. If the return value is SOCKET_ERROR,
@@ -1297,42 +1316,48 @@ begin
   if retval <= 0
   then Exit( TWaitForData.wfd_Error);
 
-  // Enough data ready to be read?
-  if retval = DesiredBytes
-  then result := TWaitForData.wfd_HaveData
-  else result := TWaitForData.wfd_Timeout;
+  // at least we have some data
+  bytesReady := Min( retval, DesiredBytes);
+  result := TWaitForData.wfd_HaveData;
 end;
 
 function TTcpSocketStreamImpl.Read(var buffer: TBytes; offset, count: Integer): Integer;
 var wfd : TWaitForData;
-    wsaError : Integer;
-    pDest : Pointer;
+    wsaError, nBytes : Integer;
+    pDest : PByte;
 const
   SLEEP_TIME = 200;
 begin
   inherited;
 
+  result := 0;
   pDest := Pointer(@buffer[offset]);
+  while count > 0 do begin
 
-  while TRUE do begin
-    if FTimeout > 0
-    then wfd := WaitForData( FTimeout,   pDest, count, wsaError)
-    else wfd := WaitForData( SLEEP_TIME, pDest, count, wsaError);
+    while TRUE do begin
+      if FTimeout > 0
+      then wfd := WaitForData( FTimeout,   pDest, count, wsaError, nBytes)
+      else wfd := WaitForData( SLEEP_TIME, pDest, count, wsaError, nBytes);
 
-    case wfd of
-      TWaitForData.wfd_Error    :  Exit(0);
-      TWaitForData.wfd_HaveData :  Break;
-      TWaitForData.wfd_Timeout  :  begin
-        if (FTimeout > 0)
-        then raise TTransportException.Create( TTransportException.TExceptionType.TimedOut,
-                                               SysErrorMessage(Cardinal(wsaError)));
+      case wfd of
+        TWaitForData.wfd_Error    :  Exit(0);
+        TWaitForData.wfd_HaveData :  Break;
+        TWaitForData.wfd_Timeout  :  begin
+          if (FTimeout > 0)
+          then raise TTransportException.Create( TTransportException.TExceptionType.TimedOut,
+                                                 SysErrorMessage(Cardinal(wsaError)));
+        end;
+      else
+        ASSERT( FALSE);
       end;
-    else
-      ASSERT( FALSE);
     end;
-  end;
 
-  Result := FTcpClient.ReceiveBuf( pDest^, count);
+    ASSERT( nBytes <= count);
+    nBytes := FTcpClient.ReceiveBuf( pDest^, nBytes);
+    Inc( pDest, nBytes);
+    Dec( count, nBytes);
+    Inc( result, nBytes);
+  end;
 end;
 
 function TTcpSocketStreamImpl.ToArray: TBytes;
@@ -1377,6 +1402,7 @@ begin
 
   FTcpClient.SendBuf( Pointer(@buffer[offset])^, count);
 end;
+{$ENDIF}
 
 {$IF CompilerVersion < 21.0}
 initialization

@@ -31,7 +31,8 @@ import Network
 import System.Environment
 import System.Exit
 import System.IO
-import System.Posix.Unistd
+import Control.Concurrent (threadDelay)
+import qualified System.IO as IO
 import qualified Data.HashMap.Strict as Map
 import qualified Data.HashSet as Set
 import qualified Data.Text.Lazy as Text
@@ -72,6 +73,20 @@ instance IsString ServerType where
   fromString "nonblocking" = NonBlocking
   fromString _ = error "not a valid server type"
 
+data TransportType = Buffered (Socket -> (IO IO.Handle))
+                   | Framed (Socket -> (IO (FramedTransport IO.Handle)))
+                   | NoTransport String
+
+getTransport :: String -> TransportType
+getTransport "buffered" = Buffered $ \s -> do
+  (h, _, _) <- (accept s)
+  IO.hSetBuffering h $ IO.BlockBuffering Nothing
+  return h
+getTransport "framed" = Framed $ \s -> do
+  (h, _, _) <- (accept s)
+  openFramedTransport h
+getTransport t = NoTransport $ "Unsupported transport: " ++ t
+
 data ProtocolType = Binary
                   | Compact
                   | JSON
@@ -87,8 +102,9 @@ defaultOptions = Options
   { port         = 9090
   , domainSocket = ""
   , serverType   = Threaded
-  , transport    = "framed"
+  , transport    = "buffered"
   , protocol     = Binary
+  -- TODO: Haskell lib does not have SSL support
   , ssl          = False
   , workers      = 4
   }
@@ -110,6 +126,10 @@ instance ThriftTest_Iface TestHandler where
   testString _ s = do
     System.IO.putStrLn $ "testString(" ++ show s ++ ")"
     return s
+
+  testBool _ x = do
+    System.IO.putStrLn $ "testBool(" ++ show x ++ ")"
+    return x
 
   testByte _ x = do
     System.IO.putStrLn $ "testByte(" ++ show x ++ ")"
@@ -215,13 +235,13 @@ instance ThriftTest_Iface TestHandler where
     System.IO.putStrLn $ "testMultiException(" ++ show s1 ++ ", " ++ show s2 ++  ")"
     case s1 of
       "Xception"   -> throw $ Xception 1001 "This is an Xception"
-      "Xception2"  -> throw $ Xception2 2002 default_Xtruct
+      "Xception2"  -> throw $ Xception2 2002 $ Xtruct "This is an Xception2" 0 0 0
       "TException" -> throw ThriftException
       _ -> return default_Xtruct{ xtruct_string_thing = s2 }
 
   testOneway _ i = do
     System.IO.putStrLn $ "testOneway(" ++ show i ++ "): Sleeping..."
-    sleep (fromIntegral i)
+    threadDelay $ (fromIntegral i) * 1000000
     System.IO.putStrLn $ "testOneway(" ++ show i ++ "): done sleeping!"
 
 main :: IO ()
@@ -230,17 +250,24 @@ main = do
   case options of
     Nothing -> showHelp
     Just Options{..} -> do
+      case Main.getTransport transport of
+        Buffered f -> runServer protocol f port
+        Framed   f -> runServer protocol f port
+        NoTransport err -> putStrLn err
       System.IO.putStrLn $ "Starting \"" ++ show serverType ++ "\" server (" ++
         show transport ++ ") listen on: " ++ domainSocket ++ show port
-      case protocol of
-        Binary  -> runServer BinaryProtocol port
-        Compact -> runServer CompactProtocol port
-        JSON    -> runServer JSONProtocol port
       where
-        runServer p = runThreadedServer (accepter p) TestHandler ThriftTest.process . PortNumber . fromIntegral
-        accepter p s = do
-          (h, _, _) <- accept s
-          return (p h, p h)
+        acceptor p f socket = do
+          t <- f socket
+          return (p t, p t)
+
+        doRunServer p f = do
+          runThreadedServer (acceptor p f) TestHandler ThriftTest.process . PortNumber . fromIntegral
+
+        runServer p f port = case p of
+          Binary  -> do doRunServer BinaryProtocol f port
+          Compact -> do doRunServer CompactProtocol f port
+          JSON    -> do doRunServer JSONProtocol f port
 
 parseFlags :: [String] -> Options -> Maybe Options
 parseFlags (flag : flags) opts = do
@@ -268,7 +295,7 @@ showHelp = System.IO.putStrLn
   \  --domain-socket arg         Unix Domain Socket (e.g. /tmp/ThriftTest.thrift)\n\
   \  --server-type arg (=simple) type of server, \"simple\", \"thread-pool\",\n\
   \                              \"threaded\", or \"nonblocking\"\n\
-  \  --transport arg (=buffered) transport: buffered, framed, http\n\
+  \  --transport arg (=buffered) transport: buffered, framed\n\
   \  --protocol arg (=binary)    protocol: binary, compact, json\n\
   \  --ssl                       Encrypted Transport using SSL\n\
   \  --processor-events          processor-events\n\
