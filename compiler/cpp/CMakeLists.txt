@@ -45,6 +45,7 @@ set(libparse_SOURCES
 )
 
 add_library(libparse STATIC ${libparse_SOURCES})
+set_target_properties(libparse PROPERTIES CXX_STANDARD 14)
 
 # Create the thrift compiler
 set( thrift_SOURCES
@@ -140,7 +141,7 @@ THRIFT_ADD_COMPILER(lua     "Enable compiler for Lua" ON)
 include_directories(${CMAKE_CURRENT_BINARY_DIR} src)
 
 add_executable(thrift-compiler ${thrift_SOURCES})
-set_target_properties(thrift-compiler PROPERTIES OUTPUT_NAME thrift)
+set_target_properties(thrift-compiler PROPERTIES OUTPUT_NAME thrift CXX_STANDARD 14)
 
 target_link_libraries(thrift-compiler libparse)
 
